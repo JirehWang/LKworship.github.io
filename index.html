@@ -12,7 +12,7 @@
 </head>
 <body>
 
-<div class="container mt-4">
+<div class="container mt-4 mb-5">
   <h2 class="mb-4">敬拜團服事排班系統</h2>
   
   <ul class="nav nav-tabs" id="myTab">
@@ -28,16 +28,41 @@
       <option value="2026-Q1">2026-Q1</option>
       <option value="2026-Q2">2026-Q2</option>
     </select>
-    <div id="dashboardTable"></div> </div>
+    <div id="dashboardTable"></div> 
+  </div>
 
   <div id="settings" class="tab-content">
-    <h4>位置設定與人員</h4>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4>位置設定與人員</h4>
+      <button class="btn btn-primary" onclick="savePositionsToServer()">儲存設定</button>
     </div>
+    
+    <div class="alert alert-info">
+      💡 提示：請在下方設定各服事位置，對應的人員名單請以<strong>半形逗號 <code>,</code></strong> 分隔 (例如：王小明,李大華)。
+    </div>
+
+    <table class="table table-bordered table-hover">
+      <thead class="table-light">
+        <tr>
+          <th style="width: 30%">位置名稱 (如: 主領)</th>
+          <th style="width: 60%">人員名單</th>
+          <th style="width: 10%; text-align: center;">操作</th>
+        </tr>
+      </thead>
+      <tbody id="positionsTbody">
+        </tbody>
+    </table>
+    
+    <button class="btn btn-outline-secondary w-100" onclick="addPositionRow('', '')">
+      + 新增一個位置
+    </button>
+  </div>
 
   <div id="schedule" class="tab-content">
     <h4>服事安排與自動排班</h4>
     <button class="btn btn-primary my-3" onclick="generateSchedule()">產生排班預覽</button>
-    <div id="previewArea"></div> </div>
+    <div id="previewArea"></div> 
+  </div>
 
   <div id="sermon" class="tab-content">
     <h4>牧師與題目與經文設定</h4>
@@ -51,36 +76,21 @@
   // 您的 GAS Web App URL
   const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
-  // 分頁切換邏輯
+  // 分頁切換邏輯 (已加入載入 Settings 的觸發)
   function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     event.target.classList.add('active');
     
-    // 如果切換到 spreadsheet，確保它正確渲染
     if(tabId === 'sermon' && !window.xs) {
       initSpreadsheet();
     }
-  }
-
-  // 初始化 x-spreadsheet
-  function initSpreadsheet() {
-    window.xs = x_spreadsheet('#x-spreadsheet-demo', {
-      showToolbar: true,
-      showGrid: true,
-      view: {
-        height: () => 400,
-        width: () => 800,
-      }
-    });
-    // 預設表頭
-    xs.loadData([{
-      name: '講員排程',
-      rows: {
-        0: { cells: { 0: {text: '日期'}, 1: {text: '牧師'}, 2: {text: '題目'}, 3: {text: '經文'} } }
-      }
-    }]);
+    
+    // 當切換到「位置設定與人員」時，自動從後端讀取最新資料
+    if(tabId === 'settings') {
+      loadPositions();
+    }
   }
 
   // 取得資料的通用 API 呼叫函數
@@ -92,13 +102,128 @@
     return await response.json();
   }
 
-  // 排班邏輯 (概念)
+  // ==========================================
+  // 位置設定與人員 (Settings Tab) 相關邏輯
+  // ==========================================
+  
+  async function loadPositions() {
+    const tbody = document.getElementById('positionsTbody');
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">正在載入資料...</td></tr>';
+    
+    try {
+      const result = await callAPI('getPositions', {});
+      if (result.status === 'success') {
+        renderPositions(result.data);
+      } else {
+        alert("載入失敗：" + result.message);
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">載入失敗，請重試</td></tr>';
+      }
+    } catch (error) {
+      alert("網路錯誤或 API 異常！");
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">網路連線錯誤</td></tr>';
+    }
+  }
+
+  function renderPositions(data) {
+    const tbody = document.getElementById('positionsTbody');
+    tbody.innerHTML = ''; 
+    
+    if (!data || data.length === 0) {
+      addPositionRow('主領', '');
+      return;
+    }
+    
+    data.forEach(item => {
+      addPositionRow(item.positionName, item.personnel);
+    });
+  }
+
+  function addPositionRow(posName, personnel) {
+    const tbody = document.getElementById('positionsTbody');
+    const tr = document.createElement('tr');
+    
+    tr.innerHTML = `
+      <td>
+        <input type="text" class="form-control pos-name" value="${posName}" placeholder="例如：吉他">
+      </td>
+      <td>
+        <input type="text" class="form-control pos-personnel" value="${personnel}" placeholder="例如：張三,李四">
+      </td>
+      <td class="text-center">
+        <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  async function savePositionsToServer() {
+    const rows = document.querySelectorAll('#positionsTbody tr');
+    let positionsData = [];
+    
+    rows.forEach(tr => {
+      const nameInput = tr.querySelector('.pos-name');
+      const personnelInput = tr.querySelector('.pos-personnel');
+      
+      if (nameInput && nameInput.value.trim() !== '') {
+        positionsData.push({
+          positionName: nameInput.value.trim(),
+          personnel: personnelInput.value.trim()
+        });
+      }
+    });
+
+    const saveBtn = event.target;
+    saveBtn.disabled = true; 
+    saveBtn.innerText = "儲存中...";
+
+    try {
+      const result = await callAPI('savePositions', { positionsData: positionsData });
+      if (result.status === 'success') {
+        alert("設定已成功儲存！");
+      } else {
+        alert("儲存失敗：" + result.message);
+      }
+    } catch (error) {
+      alert("儲存發生錯誤！");
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.innerText = "儲存設定";
+    }
+  }
+
+  // ==========================================
+  // 牧師與題目與經文設定 (Sermon Tab) 相關邏輯
+  // ==========================================
+
+  function initSpreadsheet() {
+    window.xs = x_spreadsheet('#x-spreadsheet-demo', {
+      showToolbar: true,
+      showGrid: true,
+      view: {
+        height: () => 400,
+        width: () => document.getElementById('sermon').clientWidth - 30, // 自動適應寬度
+      }
+    });
+    xs.loadData([{
+      name: '講員排程',
+      rows: {
+        0: { cells: { 0: {text: '日期'}, 1: {text: '牧師'}, 2: {text: '題目'}, 3: {text: '經文'} } }
+      }
+    }]);
+  }
+
+  function saveSermonData() {
+    // 尚未實作擷取 x-spreadsheet 資料並回傳後端的邏輯
+    alert("準備儲存牧師與經文資料...");
+  }
+
+  // ==========================================
+  // 服事安排 (Schedule Tab) 相關邏輯
+  // ==========================================
+
   function generateSchedule() {
-    // 1. 取得人員清單、各位置能力、請假名單
-    // 2. 演算法：迴圈檢查每一週
-    //    - 條件：判斷前兩週是否已經服事？(若是，則跳過該人員)
-    //    - 條件：是否在這週請假？(若是，則跳過)
-    // 3. 輸出 HTML input 表格至 previewArea，讓使用者可以進行最高權限的強制修改
+    // 自動排班邏輯保留區
+    alert("準備產生排班預覽...");
   }
 </script>
 </body>
