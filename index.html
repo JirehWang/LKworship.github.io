@@ -5,12 +5,13 @@
   <title>敬拜團服事排班系統</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/x-data-spreadsheet@1.1.5/dist/xspreadsheet.css">
-  
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   
   <style>
     .tab-content { display: none; padding-top: 20px; }
     .tab-content.active { display: block; }
+    /* 讓試算表容器適應 Bootstrap 排版 */
+    #schedule-spreadsheet { width: 100%; overflow: hidden; } 
   </style>
 </head>
 <body>
@@ -41,13 +42,15 @@
     </div>
     
     <div class="alert alert-info">
-      💡 提示：請在下方設定各服事位置，對應的人員名單請以<strong>半形逗號 <code>,</code></strong> 分隔 (例如：王小明,李大華)。
+      💡 提示：請在下方設定各服事位置，對應的人員名單請以<strong>半形逗號 <code>,</code></strong> 分隔 (例如：王小明,李大華)。<br>
+      🔄 <strong>按住最左側的「☰」即可拖曳調整位置順序。</strong>
     </div>
 
     <table class="table table-bordered table-hover">
       <thead class="table-light">
         <tr>
-          <th style="width: 30%">位置名稱 (如: 主領)</th>
+          <th style="width: 5%; text-align: center;">↕️</th> 
+          <th style="width: 25%">位置名稱 (如: 主領)</th>
           <th style="width: 60%">人員名單</th>
           <th style="width: 10%; text-align: center;">操作</th>
         </tr>
@@ -87,17 +90,13 @@
 
       <div class="col-md-8">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="mb-0">2. 排班預覽 (可直接點擊修改)</h5>
+          <h5 class="mb-0">2. 排班預覽 (可如 Excel 般編輯)</h5>
           <button class="btn btn-success" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存至資料庫</button>
         </div>
         
         <div class="table-responsive">
-          <table class="table table-bordered table-sm" id="previewTable" style="display: none; font-size: 0.9em;">
-            <thead class="table-light" id="previewThead">
-              </thead>
-            <tbody id="previewTbody">
-              </tbody>
-          </table>
+          <div id="schedule-spreadsheet" style="display: none;"></div>
+          
           <div id="previewPlaceholder" class="text-center text-muted mt-5">
             請先在左側設定日期，並點擊「產生排班預覽」
           </div>
@@ -116,18 +115,14 @@
 <script src="https://unpkg.com/x-data-spreadsheet@1.1.5/dist/xspreadsheet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/zh.js"></script>
-
-<script>
-  // 您的 GAS Web App URL
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script> <script>
   const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
-  // 分頁切換邏輯
   function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     
-    // 正確讓上方頁籤也亮起來
     document.querySelector(`a[onclick="switchTab('${tabId}')"]`).classList.add('active');
     
     if(tabId === 'sermon' && !window.xs) {
@@ -141,7 +136,6 @@
     }
   }
 
-  // 取得資料的通用 API 呼叫函數
   async function callAPI(action, payload) {
     const response = await fetch(API_URL, {
       method: 'POST',
@@ -154,9 +148,11 @@
   // 位置設定與人員 (Settings Tab) 相關邏輯
   // ==========================================
   
+  let sortablePositions = null; // 宣告拖曳實體變數
+
   async function loadPositions() {
     const tbody = document.getElementById('positionsTbody');
-    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">正在載入資料...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">正在載入資料...</td></tr>';
     
     try {
       const result = await callAPI('getPositions', {});
@@ -164,11 +160,11 @@
         renderPositions(result.data);
       } else {
         alert("載入失敗：" + result.message);
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">載入失敗，請重試</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">載入失敗，請重試</td></tr>';
       }
     } catch (error) {
       alert("網路錯誤或 API 異常！");
-      tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">網路連線錯誤</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">網路連線錯誤</td></tr>';
     }
   }
 
@@ -178,11 +174,18 @@
     
     if (!data || data.length === 0) {
       addPositionRow('主領', '');
-      return;
+    } else {
+      data.forEach(item => {
+        addPositionRow(item.positionName, item.personnel);
+      });
     }
-    
-    data.forEach(item => {
-      addPositionRow(item.positionName, item.personnel);
+
+    // 初始化拖曳功能
+    if (sortablePositions) sortablePositions.destroy();
+    sortablePositions = new Sortable(tbody, {
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'bg-light'
     });
   }
 
@@ -191,13 +194,14 @@
     const tr = document.createElement('tr');
     
     tr.innerHTML = `
+      <td class="text-center align-middle drag-handle" style="cursor: grab; font-size: 1.2em; color: #888;" title="按住拖曳排序">☰</td>
       <td>
         <input type="text" class="form-control pos-name" value="${posName}" placeholder="例如：吉他">
       </td>
       <td>
         <input type="text" class="form-control pos-personnel" value="${personnel}" placeholder="例如：張三,李四">
       </td>
-      <td class="text-center">
+      <td class="text-center align-middle">
         <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button>
       </td>
     `;
@@ -245,10 +249,10 @@
 
   let currentPositions = []; 
   let generatedScheduleData = []; 
-  let fpInstance = null; // 儲存日曆實體
+  let fpInstance = null; 
+  window.scheduleXs = null; // 全域變數存放排班表的試算表實體
 
   async function initScheduleTab() {
-    // 1. 初始化 Flatpickr 日曆 (多選模式、繁體中文)
     if (!fpInstance) {
       fpInstance = flatpickr("#multiDatePicker", {
         mode: "multiple",
@@ -257,7 +261,6 @@
       });
     }
 
-    // 2. 取得後端人員名單
     try {
       const result = await callAPI('getPositions', {});
       if (result.status === 'success') {
@@ -268,31 +271,23 @@
     }
   }
 
-  // 處理點擊「確認新增」按鈕
   function addSelectedDates() {
     if (!fpInstance) return;
-    
     const selectedDates = fpInstance.selectedDates;
     
     if (selectedDates.length === 0) {
-      alert("請先在日曆上點選至少一個日期！");
-      return;
+      alert("請先在日曆上點選至少一個日期！"); return;
     }
 
-    // 排序日期
     selectedDates.sort((a, b) => a - b);
-
-    // 迴圈新增設定列
     selectedDates.forEach(dateObj => {
       const dateString = flatpickr.formatDate(dateObj, "Y-m-d");
       addScheduleDateRow(dateString);
     });
 
-    // 清空日曆選取狀態
     fpInstance.clear();
   }
 
-// 修改：將聚會類別改為文字輸入框，並預設填入「主日」
   function addScheduleDateRow(dateVal = '') {
     const container = document.getElementById('dateSettingsContainer');
     const div = document.createElement('div');
@@ -317,8 +312,7 @@
 
   function generateSchedule() {
     if (currentPositions.length === 0) {
-      alert("請先至「位置設定與人員」建立資料！");
-      return;
+      alert("請先至「位置設定與人員」建立資料！"); return;
     }
 
     const rows = document.querySelectorAll('.schedule-date-row');
@@ -377,9 +371,7 @@
         }
 
         dailyRecord[posName] = selectedPerson;
-        if (selectedPerson) {
-          assignedToday.push(selectedPerson);
-        }
+        if (selectedPerson) assignedToday.push(selectedPerson);
 
         candidates.forEach(person => {
           if (person === selectedPerson) {
@@ -397,57 +389,101 @@
     renderPreviewTable(generatedScheduleData);
   }
 
+  // 修改：用 x-spreadsheet 渲染排班預覽表
   function renderPreviewTable(data) {
-    const thead = document.getElementById('previewThead');
-    const tbody = document.getElementById('previewTbody');
-    const table = document.getElementById('previewTable');
+    const spreadsheetContainer = document.getElementById('schedule-spreadsheet');
     const placeholder = document.getElementById('previewPlaceholder');
     const saveBtn = document.getElementById('saveScheduleBtn');
 
-    thead.innerHTML = ''; tbody.innerHTML = '';
-
-    let headers = ['日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
-    let trHead = document.createElement('tr');
-    headers.forEach(h => {
-      let th = document.createElement('th');
-      th.innerText = h;
-      trHead.appendChild(th);
+    let headers = ['年度', '季度', '日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
+    let rowsData = {};
+    
+    rowsData[0] = { cells: {} };
+    headers.forEach((h, colIndex) => {
+      rowsData[0].cells[colIndex] = { text: h };
     });
-    thead.appendChild(trHead);
 
-    data.forEach((row, rowIndex) => {
-      let tr = document.createElement('tr');
-      headers.forEach(h => {
-        let td = document.createElement('td');
-        if (h === '日期' || h === '聚會類別') {
-          td.innerText = row[h]; 
-        } else {
-          let input = document.createElement('input');
-          input.type = 'text';
-          input.className = 'form-control form-control-sm';
-          input.style.minWidth = '70px';
-          input.value = row[h] || '';
-          input.onchange = (e) => { generatedScheduleData[rowIndex][h] = e.target.value.trim(); };
-          td.appendChild(input);
-        }
-        tr.appendChild(td);
+    data.forEach((rowObj, rowIndex) => {
+      rowsData[rowIndex + 1] = { cells: {} };
+      headers.forEach((h, colIndex) => {
+        rowsData[rowIndex + 1].cells[colIndex] = { text: rowObj[h] || '' };
       });
-      tbody.appendChild(tr);
     });
+
+    const sheetData = [{
+      name: '排班結果',
+      rows: rowsData
+    }];
 
     placeholder.style.display = 'none';
-    table.style.display = 'table';
+    spreadsheetContainer.style.display = 'block';
     saveBtn.style.display = 'inline-block';
+
+    if (!window.scheduleXs) {
+      window.scheduleXs = x_spreadsheet('#schedule-spreadsheet', {
+        showToolbar: false, 
+        showGrid: true,
+        view: {
+          height: () => 400,
+          width: () => spreadsheetContainer.parentElement.clientWidth, 
+        }
+      });
+    }
+    
+    window.scheduleXs.loadData(sheetData);
   }
 
+  // 修改：從 x-spreadsheet 讀取修改後的資料並存檔
   async function saveGeneratedSchedule() {
-    if (generatedScheduleData.length === 0) return;
+    if (!window.scheduleXs) return;
+
+    const sheetData = window.scheduleXs.getData()[0];
+    if (!sheetData || !sheetData.rows) return;
+
+    const rows = sheetData.rows;
+    if (!rows[0] || !rows[0].cells) return; 
+
+    const headers = [];
+    Object.keys(rows[0].cells).forEach(colKey => {
+      headers[colKey] = rows[0].cells[colKey].text;
+    });
+
+    let finalData = [];
+    const rowKeys = Object.keys(rows).filter(k => k !== 'len').map(Number).sort((a,b) => a-b);
+    
+    rowKeys.forEach(rowIndex => {
+      if (rowIndex === 0) return; 
+      
+      let rowObj = {};
+      let hasDate = false;
+
+      headers.forEach((h, colIndex) => {
+        if (h) {
+          let cell = rows[rowIndex].cells[colIndex];
+          let text = cell ? cell.text : '';
+          rowObj[h] = text;
+          
+          if (h === '日期' && text.trim() !== '') {
+            hasDate = true;
+          }
+        }
+      });
+
+      if (hasDate) {
+        finalData.push(rowObj);
+      }
+    });
+
+    if (finalData.length === 0) {
+      alert("沒有可儲存的有效排班資料 (缺少日期)！");
+      return;
+    }
 
     const btn = document.getElementById('saveScheduleBtn');
     btn.disabled = true; btn.innerText = '儲存中...';
 
     try {
-      const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
+      const result = await callAPI('saveSchedule', { scheduleData: finalData });
       if (result.status === 'success') {
         alert("🎉 排班表已成功儲存！");
       } else {
