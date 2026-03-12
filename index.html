@@ -292,7 +292,7 @@
     fpInstance.clear();
   }
 
-  // 修改：帶入預設日期，並將聚會預設為「主日」
+// 修改：將聚會類別改為文字輸入框，並預設填入「主日」
   function addScheduleDateRow(dateVal = '') {
     const container = document.getElementById('dateSettingsContainer');
     const div = document.createElement('div');
@@ -301,11 +301,7 @@
     div.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-1">
         <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateVal}" required>
-        <select class="form-select form-select-sm s-type w-50 text-primary fw-bold">
-          <option value="主日" selected>主日</option>
-          <option value="青年聚會">青年聚會</option>
-          <option value="禱告會">禱告會</option>
-        </select>
+        <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold" value="主日" placeholder="聚會類別">
         <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.schedule-date-row').remove()">x</button>
       </div>
       <input type="text" class="form-control form-control-sm s-leave" placeholder="請假人員 (如: 王小明,李大華)">
