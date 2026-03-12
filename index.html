@@ -67,7 +67,8 @@
   <div id="schedule" class="tab-content">
     <div class="row">
       <div class="col-md-4 border-end">
-        <h5 class="mb-3">1. 設定聚會條件</h5>
+        
+        <h5 class="mb-3">1. 產生全新排班</h5>
         
         <div class="mb-3 p-2 bg-light border rounded">
           <label class="form-label fw-bold text-primary">挑選排班日期：</label>
@@ -85,12 +86,26 @@
         <div id="dateSettingsContainer">
           </div>
         
-        <button class="btn btn-success w-100 mt-3" onclick="generateSchedule()">產生排班預覽 🚀</button>
+        <button class="btn btn-primary w-100 mt-2 mb-4" onclick="generateSchedule()">產生排班預覽 🚀</button>
+
+        <hr>
+
+        <h5 class="mb-3 text-success">2. 讀取並修改現有排班</h5>
+        <div class="p-2 border border-success border-opacity-50 rounded bg-success bg-opacity-10">
+          <label class="form-label fw-bold text-success">選擇讀取區間：</label>
+          <div class="d-flex mb-2">
+            <input type="date" id="editStartDate" class="form-control form-control-sm me-1" title="開始日期">
+            <span class="align-self-center mx-1">至</span>
+            <input type="date" id="editEndDate" class="form-control form-control-sm ms-1" title="結束日期">
+          </div>
+          <button class="btn btn-success w-100" onclick="loadExistingSchedule()">讀取資料 📥</button>
+        </div>
+
       </div>
 
       <div class="col-md-8">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="mb-0">2. 排班預覽 (可如 Excel 般編輯)</h5>
+          <h5 class="mb-0">排班預覽 (可如 Excel 般編輯)</h5>
           <button class="btn btn-success" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存至資料庫</button>
         </div>
         
@@ -98,7 +113,7 @@
           <div id="schedule-spreadsheet" style="display: none;"></div>
           
           <div id="previewPlaceholder" class="text-center text-muted mt-5">
-            請先在左側設定日期，並點擊「產生排班預覽」
+            請先在左側設定日期，並點擊「產生排班」或「讀取資料」
           </div>
         </div>
       </div>
@@ -115,7 +130,8 @@
 <script src="https://unpkg.com/x-data-spreadsheet@1.1.5/dist/xspreadsheet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/zh.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script> <script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script> 
+<script>
   const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
   function switchTab(tabId) {
@@ -148,7 +164,7 @@
   // 位置設定與人員 (Settings Tab) 相關邏輯
   // ==========================================
   
-  let sortablePositions = null; // 宣告拖曳實體變數
+  let sortablePositions = null; 
 
   async function loadPositions() {
     const tbody = document.getElementById('positionsTbody');
@@ -180,7 +196,6 @@
       });
     }
 
-    // 初始化拖曳功能
     if (sortablePositions) sortablePositions.destroy();
     sortablePositions = new Sortable(tbody, {
       handle: '.drag-handle',
@@ -250,7 +265,7 @@
   let currentPositions = []; 
   let generatedScheduleData = []; 
   let fpInstance = null; 
-  window.scheduleXs = null; // 全域變數存放排班表的試算表實體
+  window.scheduleXs = null; 
 
   async function initScheduleTab() {
     if (!fpInstance) {
@@ -389,7 +404,51 @@
     renderPreviewTable(generatedScheduleData);
   }
 
-  // 修改：用 x-spreadsheet 渲染排班預覽表
+  // 讀取特定區間的已排定班表供修改
+  async function loadExistingSchedule() {
+    if (currentPositions.length === 0) {
+      alert("請先至「位置設定與人員」建立資料！"); return;
+    }
+
+    const startDate = document.getElementById('editStartDate').value;
+    const endDate = document.getElementById('editEndDate').value;
+
+    if (!startDate || !endDate) {
+      alert("請完整選擇「開始」與「結束」日期！"); return;
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+      alert("開始日期不能晚於結束日期！"); return;
+    }
+
+    const btn = event.target;
+    btn.disabled = true; 
+    btn.innerText = "讀取中...";
+
+    try {
+      const result = await callAPI('getScheduleByDateRange', { 
+        startDate: startDate, 
+        endDate: endDate 
+      });
+      
+      if (result.status === 'success') {
+        if (result.data.length === 0) {
+          alert("該日期區間內沒有找到任何排班資料。");
+        } else {
+          renderPreviewTable(result.data);
+          alert(`✅ 成功讀取 ${result.data.length} 天的排班資料！\n您可以直接在右側試算表修改後按下儲存。`);
+        }
+      } else {
+        alert("讀取失敗：" + result.message);
+      }
+    } catch (error) {
+      alert("網路連線錯誤！");
+    } finally {
+      btn.disabled = false; 
+      btn.innerText = "讀取資料 📥";
+    }
+  }
+
   function renderPreviewTable(data) {
     const spreadsheetContainer = document.getElementById('schedule-spreadsheet');
     const placeholder = document.getElementById('previewPlaceholder');
@@ -433,7 +492,6 @@
     window.scheduleXs.loadData(sheetData);
   }
 
-  // 修改：從 x-spreadsheet 讀取修改後的資料並存檔
   async function saveGeneratedSchedule() {
     if (!window.scheduleXs) return;
 
