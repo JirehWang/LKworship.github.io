@@ -10,8 +10,11 @@
   <style>
     .tab-content { display: none; padding-top: 20px; }
     .tab-content.active { display: block; }
-    /* 讓試算表容器適應 Bootstrap 排版 */
     #schedule-spreadsheet { width: 100%; overflow: hidden; } 
+    /* 讓公佈欄表格的文字置中且垂直對齊 */
+    #dashboardTable table th, #dashboardTable table td { text-align: center; vertical-align: middle; }
+    /* 警告行的特殊高亮 */
+    .warning-row { background-color: #fff3cd !important; border-left: 5px solid #ffc107; }
   </style>
 </head>
 <body>
@@ -27,12 +30,26 @@
   </ul>
 
   <div id="dashboard" class="tab-content active">
-    <h4>公佈欄</h4>
-    <select id="quarterSelect" class="form-select w-25 mb-3">
-      <option value="2026-Q1">2026-Q1</option>
-      <option value="2026-Q2">2026-Q2</option>
-    </select>
-    <div id="dashboardTable"></div> 
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4>公佈欄</h4>
+      <div class="d-flex align-items-center">
+        <label class="form-label me-2 mb-0 fw-bold">選擇季度：</label>
+        <select id="quarterSelect" class="form-select w-auto" onchange="loadDashboard()">
+          <option value="2026-Q1" selected>2026-Q1</option>
+          <option value="2026-Q2">2026-Q2</option>
+          <option value="2026-Q3">2026-Q3</option>
+          <option value="2026-Q4">2026-Q4</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="alert alert-light border">
+      💡 系統會自動抓取已發布的班表。若出現 <span class="badge bg-warning text-dark">⚠️ 警告</span> 標記，代表排班有違規情況（如連續服事或同一天重複排班），請至「服事安排」進行修正。
+    </div>
+    
+    <div id="dashboardTable">
+      <div class="text-center text-muted my-5">請選擇季度以載入資料...</div>
+    </div> 
   </div>
 
   <div id="settings" class="tab-content">
@@ -132,6 +149,7 @@
 <script src="https://npmcdn.com/flatpickr/dist/l10n/zh.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script> 
 <script>
+  // 您的 GAS Web App URL
   const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
   function switchTab(tabId) {
@@ -141,16 +159,17 @@
     
     document.querySelector(`a[onclick="switchTab('${tabId}')"]`).classList.add('active');
     
-    if(tabId === 'sermon' && !window.xs) {
-      initSpreadsheet();
-    }
-    if(tabId === 'settings') {
-      loadPositions();
-    }
-    if(tabId === 'schedule') {
-      initScheduleTab();
-    }
+    // 初始化或載入資料
+    if(tabId === 'dashboard') loadDashboard();
+    if(tabId === 'settings') loadPositions();
+    if(tabId === 'schedule') initScheduleTab();
+    if(tabId === 'sermon' && !window.xs) initSpreadsheet();
   }
+
+  // 網頁載入完成後，預設載入公佈欄資料
+  window.onload = () => {
+    loadDashboard();
+  };
 
   async function callAPI(action, payload) {
     const response = await fetch(API_URL, {
@@ -161,7 +180,104 @@
   }
 
   // ==========================================
-  // 位置設定與人員 (Settings Tab) 相關邏輯
+  // 1. 公佈欄 (Dashboard) 渲染邏輯
+  // ==========================================
+  
+  async function loadDashboard() {
+    const container = document.getElementById('dashboardTable');
+    container.innerHTML = '<div class="text-center text-muted my-5"><h5>正在載入最新班表...</h5><div class="spinner-border text-primary mt-2" role="status"></div></div>';
+
+    const selectedVal = document.getElementById('quarterSelect').value;
+    if (!selectedVal) return;
+
+    // 將 "2026-Q1" 拆解為 "2026" 和 "Q1"
+    const [year, quarter] = selectedVal.split('-');
+
+    try {
+      const result = await callAPI('getSchedule', { year: year, quarter: quarter });
+      if (result.status === 'success') {
+        renderDashboardTable(result.data);
+      } else {
+        container.innerHTML = `<div class="alert alert-danger">載入失敗：${result.message}</div>`;
+      }
+    } catch (error) {
+      container.innerHTML = `<div class="alert alert-danger">網路連線錯誤或 API 異常！</div>`;
+    }
+  }
+
+  function renderDashboardTable(data) {
+    const container = document.getElementById('dashboardTable');
+    container.innerHTML = '';
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div class="alert alert-warning text-center my-4">該季度目前沒有任何排班資料。</div>';
+      return;
+    }
+
+    // 取得要顯示的標題列 (排除後端傳來的系統用屬性)
+    let ignoreKeys = ['hasWarning', 'warningMessage', '年度', '季度'];
+    let headers = Object.keys(data[0]).filter(k => !ignoreKeys.includes(k));
+
+    let table = document.createElement('table');
+    table.className = 'table table-bordered table-hover align-middle shadow-sm';
+    table.style.fontSize = '0.9em';
+
+    // 產生表頭
+    let thead = document.createElement('thead');
+    thead.className = 'table-primary';
+    let trHead = document.createElement('tr');
+    headers.forEach(h => {
+      let th = document.createElement('th');
+      th.innerText = h;
+      trHead.appendChild(th);
+    });
+    thead.appendChild(trHead);
+    table.appendChild(thead);
+
+    // 產生表格內容
+    let tbody = document.createElement('tbody');
+    data.forEach(row => {
+      let tr = document.createElement('tr');
+
+      // 如果這列有警告，套用醒目的 CSS Class
+      if (row.hasWarning) {
+        tr.classList.add('warning-row');
+      }
+
+      headers.forEach(h => {
+        let td = document.createElement('td');
+        let cellText = row[h] || '';
+        
+        // 如果是在「日期」欄位且該行有警告，顯示具體警告訊息
+        if (h === '日期' && row.hasWarning) {
+          td.innerHTML = `
+            <strong>${cellText}</strong><br>
+            <span class="badge bg-warning text-dark mt-1 text-wrap" style="line-height: 1.2;">
+              ${row.warningMessage}
+            </span>
+          `;
+        } else {
+          // 一般欄位直接顯示文字
+          td.innerText = cellText;
+          // 若為空值可稍微淡化
+          if(cellText === '') td.classList.add('text-muted');
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    
+    // 加上響應式容器，避免小螢幕破版
+    let responsiveDiv = document.createElement('div');
+    responsiveDiv.className = 'table-responsive';
+    responsiveDiv.appendChild(table);
+    
+    container.appendChild(responsiveDiv);
+  }
+
+  // ==========================================
+  // 2. 位置設定與人員 (Settings Tab) 相關邏輯
   // ==========================================
   
   let sortablePositions = null; 
@@ -259,7 +375,7 @@
   }
 
   // ==========================================
-  // 服事安排 (Schedule Tab) 相關邏輯
+  // 3. 服事安排 (Schedule Tab) 相關邏輯
   // ==========================================
 
   let currentPositions = []; 
@@ -404,7 +520,6 @@
     renderPreviewTable(generatedScheduleData);
   }
 
-  // 讀取特定區間的已排定班表供修改
   async function loadExistingSchedule() {
     if (currentPositions.length === 0) {
       alert("請先至「位置設定與人員」建立資料！"); return;
@@ -544,6 +659,8 @@
       const result = await callAPI('saveSchedule', { scheduleData: finalData });
       if (result.status === 'success') {
         alert("🎉 排班表已成功儲存！");
+        // 儲存成功後自動切換至公佈欄查看最新結果
+        switchTab('dashboard');
       } else {
         alert("儲存失敗：" + result.message);
       }
@@ -555,7 +672,7 @@
   }
 
   // ==========================================
-  // 牧師與題目與經文設定 (Sermon Tab) 相關邏輯
+  // 4. 牧師與題目與經文設定 (Sermon Tab) 相關邏輯
   // ==========================================
 
   function initSpreadsheet() {
