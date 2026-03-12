@@ -59,9 +59,39 @@
   </div>
 
   <div id="schedule" class="tab-content">
-    <h4>服事安排與自動排班</h4>
-    <button class="btn btn-primary my-3" onclick="generateSchedule()">產生排班預覽</button>
-    <div id="previewArea"></div> 
+    <div class="row">
+      <div class="col-md-4 border-end">
+        <h5 class="mb-3">1. 設定聚會條件</h5>
+        <div class="alert alert-secondary" style="font-size: 0.9em;">
+          請依序新增要排班的日期。若有人請假，請在該日期填入姓名（以半形逗號分隔）。
+        </div>
+        
+        <div id="dateSettingsContainer">
+          </div>
+        
+        <button class="btn btn-outline-secondary w-100 mb-3" onclick="addScheduleDateRow()">+ 新增聚會日期</button>
+        <button class="btn btn-primary w-100" onclick="generateSchedule()">產生排班預覽 🚀</button>
+      </div>
+
+      <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">2. 排班預覽 (可直接點擊修改)</h5>
+          <button class="btn btn-success" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存至資料庫</button>
+        </div>
+        
+        <div class="table-responsive">
+          <table class="table table-bordered table-sm" id="previewTable" style="display: none; font-size: 0.9em;">
+            <thead class="table-light" id="previewThead">
+              </thead>
+            <tbody id="previewTbody">
+              </tbody>
+          </table>
+          <div id="previewPlaceholder" class="text-center text-muted mt-5">
+            請先在左側設定日期，並點擊「產生排班預覽」
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="sermon" class="tab-content">
@@ -76,20 +106,24 @@
   // 您的 GAS Web App URL
   const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
-  // 分頁切換邏輯 (已加入載入 Settings 的觸發)
+  // 分頁切換邏輯
   function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
-    event.target.classList.add('active');
+    
+    // 正確讓上方頁籤也亮起來
+    document.querySelector(`a[onclick="switchTab('${tabId}')"]`).classList.add('active');
     
     if(tabId === 'sermon' && !window.xs) {
       initSpreadsheet();
     }
-    
-    // 當切換到「位置設定與人員」時，自動從後端讀取最新資料
     if(tabId === 'settings') {
       loadPositions();
+    }
+    // 加入這行：切換到「服事安排」時，去抓最新的位置與人員名單
+    if(tabId === 'schedule') {
+      initScheduleTab();
     }
   }
 
@@ -192,6 +226,197 @@
   }
 
   // ==========================================
+  // 服事安排 (Schedule Tab) 相關邏輯
+  // ==========================================
+
+  let currentPositions = []; 
+  let generatedScheduleData = []; 
+
+  async function initScheduleTab() {
+    try {
+      const result = await callAPI('getPositions', {});
+      if (result.status === 'success') {
+        currentPositions = result.data;
+        if (document.getElementById('dateSettingsContainer').children.length === 0) {
+          addScheduleDateRow();
+        }
+      }
+    } catch (error) {
+      console.error("無法取得位置清單：", error);
+    }
+  }
+
+  function addScheduleDateRow() {
+    const container = document.getElementById('dateSettingsContainer');
+    const div = document.createElement('div');
+    div.className = 'card mb-2 p-2 schedule-date-row';
+    div.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <input type="date" class="form-control form-control-sm s-date w-50 me-1" required>
+        <select class="form-select form-select-sm s-type w-50">
+          <option value="主日崇拜">主日崇拜</option>
+          <option value="青年聚會">青年聚會</option>
+          <option value="禱告會">禱告會</option>
+        </select>
+        <button class="btn btn-sm btn-danger ms-1" onclick="this.closest('.schedule-date-row').remove()">x</button>
+      </div>
+      <input type="text" class="form-control form-control-sm s-leave" placeholder="請假人員 (如: 王小明,李大華)">
+    `;
+    container.appendChild(div);
+  }
+
+  function getQuarter(dateString) {
+    const d = new Date(dateString);
+    const q = Math.floor((d.getMonth() + 3) / 3);
+    return `Q${q}`;
+  }
+
+  function generateSchedule() {
+    if (currentPositions.length === 0) {
+      alert("請先至「位置設定與人員」建立資料！");
+      return;
+    }
+
+    const rows = document.querySelectorAll('.schedule-date-row');
+    let inputConditions = [];
+    rows.forEach(row => {
+      const dateVal = row.querySelector('.s-date').value;
+      const typeVal = row.querySelector('.s-type').value;
+      const leaveVal = row.querySelector('.s-leave').value;
+      if (dateVal) {
+        inputConditions.push({
+          date: dateVal,
+          type: typeVal,
+          leaves: leaveVal.split(',').map(s => s.trim()).filter(s => s !== '') 
+        });
+      }
+    });
+
+    if (inputConditions.length === 0) {
+      alert("請至少設定一天的聚會日期！"); return;
+    }
+
+    inputConditions.sort((a, b) => a.date.localeCompare(b.date));
+
+    let consecutiveCount = {}; 
+    currentPositions.forEach(p => { consecutiveCount[p.positionName] = {}; });
+    
+    let previousLeader = null; 
+    generatedScheduleData = [];
+
+    inputConditions.forEach(dayInfo => {
+      let dailyRecord = {
+        '年度': dayInfo.date.substring(0, 4),
+        '季度': getQuarter(dayInfo.date),
+        '日期': dayInfo.date,
+        '聚會類別': dayInfo.type
+      };
+      
+      let assignedToday = []; 
+
+      currentPositions.forEach(posObj => {
+        let posName = posObj.positionName;
+        let candidates = posObj.personnel.split(',').map(s => s.trim()).filter(s => s !== '');
+
+        let validCandidates = candidates.filter(person => {
+          if (dayInfo.leaves.includes(person)) return false; 
+          if (assignedToday.includes(person)) return false;  
+          if (posName === '主領' && person === previousLeader) return false; 
+          if ((consecutiveCount[posName][person] || 0) >= 2) return false;   
+          return true; 
+        });
+
+        let selectedPerson = "";
+        if (validCandidates.length > 0) {
+          let randomIndex = Math.floor(Math.random() * validCandidates.length);
+          selectedPerson = validCandidates[randomIndex];
+        }
+
+        dailyRecord[posName] = selectedPerson;
+        if (selectedPerson) {
+          assignedToday.push(selectedPerson);
+        }
+
+        candidates.forEach(person => {
+          if (person === selectedPerson) {
+            consecutiveCount[posName][person] = (consecutiveCount[posName][person] || 0) + 1;
+          } else {
+            consecutiveCount[posName][person] = 0;
+          }
+        });
+      }); 
+
+      previousLeader = dailyRecord['主領'];
+      generatedScheduleData.push(dailyRecord);
+    }); 
+
+    renderPreviewTable(generatedScheduleData);
+  }
+
+  function renderPreviewTable(data) {
+    const thead = document.getElementById('previewThead');
+    const tbody = document.getElementById('previewTbody');
+    const table = document.getElementById('previewTable');
+    const placeholder = document.getElementById('previewPlaceholder');
+    const saveBtn = document.getElementById('saveScheduleBtn');
+
+    thead.innerHTML = ''; tbody.innerHTML = '';
+
+    let headers = ['日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
+    let trHead = document.createElement('tr');
+    headers.forEach(h => {
+      let th = document.createElement('th');
+      th.innerText = h;
+      trHead.appendChild(th);
+    });
+    thead.appendChild(trHead);
+
+    data.forEach((row, rowIndex) => {
+      let tr = document.createElement('tr');
+      headers.forEach(h => {
+        let td = document.createElement('td');
+        if (h === '日期' || h === '聚會類別') {
+          td.innerText = row[h]; 
+        } else {
+          let input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control form-control-sm';
+          input.style.minWidth = '70px';
+          input.value = row[h] || '';
+          input.onchange = (e) => { generatedScheduleData[rowIndex][h] = e.target.value.trim(); };
+          td.appendChild(input);
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+
+    placeholder.style.display = 'none';
+    table.style.display = 'table';
+    saveBtn.style.display = 'inline-block';
+  }
+
+  async function saveGeneratedSchedule() {
+    if (generatedScheduleData.length === 0) return;
+
+    const btn = document.getElementById('saveScheduleBtn');
+    btn.disabled = true; btn.innerText = '儲存中...';
+
+    try {
+      const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
+      if (result.status === 'success') {
+        alert("🎉 排班表已成功儲存！");
+      } else {
+        alert("儲存失敗：" + result.message);
+      }
+    } catch (error) {
+      alert("網路連線錯誤！");
+    } finally {
+      btn.disabled = false; btn.innerText = '儲存至資料庫';
+    }
+  }
+
+  // ==========================================
   // 牧師與題目與經文設定 (Sermon Tab) 相關邏輯
   // ==========================================
 
@@ -201,7 +426,7 @@
       showGrid: true,
       view: {
         height: () => 400,
-        width: () => document.getElementById('sermon').clientWidth - 30, // 自動適應寬度
+        width: () => document.getElementById('sermon').clientWidth - 30, 
       }
     });
     xs.loadData([{
@@ -213,17 +438,7 @@
   }
 
   function saveSermonData() {
-    // 尚未實作擷取 x-spreadsheet 資料並回傳後端的邏輯
     alert("準備儲存牧師與經文資料...");
-  }
-
-  // ==========================================
-  // 服事安排 (Schedule Tab) 相關邏輯
-  // ==========================================
-
-  function generateSchedule() {
-    // 自動排班邏輯保留區
-    alert("準備產生排班預覽...");
   }
 </script>
 </body>
