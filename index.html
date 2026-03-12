@@ -320,7 +320,7 @@
     });
   }
 
-  function addPositionRow(posName, personnel) {
+  function addPositionRow(posName, personnel, isRequired = "是") {
     const tbody = document.getElementById('positionsTbody');
     const tr = document.createElement('tr');
     
@@ -332,6 +332,14 @@
       <td>
         <input type="text" class="form-control pos-personnel" value="${personnel}" placeholder="例如：張三,李四">
       </td>
+      <td>
+      <select class="form-select pos-required">
+        <option value="是" ${isRequired === "是" ? "selected" : ""}>是</option>
+        <option value="否" ${isRequired === "否" ? "selected" : ""}>否</option>
+      </select>
+    </td>
+    <td class="text-center"><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button></td>
+  `
       <td class="text-center align-middle">
         <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button>
       </td>
