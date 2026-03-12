@@ -5,6 +5,9 @@
   <title>敬拜團服事排班系統</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/x-data-spreadsheet@1.1.5/dist/xspreadsheet.css">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  
   <style>
     .tab-content { display: none; padding-top: 20px; }
     .tab-content.active { display: block; }
@@ -62,15 +65,24 @@
     <div class="row">
       <div class="col-md-4 border-end">
         <h5 class="mb-3">1. 設定聚會條件</h5>
+        
+        <div class="mb-3 p-2 bg-light border rounded">
+          <label class="form-label fw-bold text-primary">挑選排班日期：</label>
+          <div class="input-group">
+            <input type="text" id="multiDatePicker" class="form-control bg-white" placeholder="點此打開日曆多選...">
+            <button class="btn btn-primary" onclick="addSelectedDates()">確認新增</button>
+          </div>
+          <small class="text-muted mt-1 d-block">提示：可在日曆上點擊多個日期。</small>
+        </div>
+
         <div class="alert alert-secondary" style="font-size: 0.9em;">
-          請依序新增要排班的日期。若有人請假，請在該日期填入姓名（以半形逗號分隔）。
+          下方為已建立的日期。聚會預設為「主日」，可手動修改。若有人請假請填寫姓名。
         </div>
         
         <div id="dateSettingsContainer">
           </div>
         
-        <button class="btn btn-outline-secondary w-100 mb-3" onclick="addScheduleDateRow()">+ 新增聚會日期</button>
-        <button class="btn btn-primary w-100" onclick="generateSchedule()">產生排班預覽 🚀</button>
+        <button class="btn btn-success w-100 mt-3" onclick="generateSchedule()">產生排班預覽 🚀</button>
       </div>
 
       <div class="col-md-8">
@@ -102,6 +114,9 @@
 </div>
 
 <script src="https://unpkg.com/x-data-spreadsheet@1.1.5/dist/xspreadsheet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/zh.js"></script>
+
 <script>
   // 您的 GAS Web App URL
   const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
@@ -121,7 +136,6 @@
     if(tabId === 'settings') {
       loadPositions();
     }
-    // 加入這行：切換到「服事安排」時，去抓最新的位置與人員名單
     if(tabId === 'schedule') {
       initScheduleTab();
     }
@@ -231,34 +245,68 @@
 
   let currentPositions = []; 
   let generatedScheduleData = []; 
+  let fpInstance = null; // 儲存日曆實體
 
   async function initScheduleTab() {
+    // 1. 初始化 Flatpickr 日曆 (多選模式、繁體中文)
+    if (!fpInstance) {
+      fpInstance = flatpickr("#multiDatePicker", {
+        mode: "multiple",
+        dateFormat: "Y-m-d",
+        locale: "zh"
+      });
+    }
+
+    // 2. 取得後端人員名單
     try {
       const result = await callAPI('getPositions', {});
       if (result.status === 'success') {
         currentPositions = result.data;
-        if (document.getElementById('dateSettingsContainer').children.length === 0) {
-          addScheduleDateRow();
-        }
       }
     } catch (error) {
       console.error("無法取得位置清單：", error);
     }
   }
 
-  function addScheduleDateRow() {
+  // 處理點擊「確認新增」按鈕
+  function addSelectedDates() {
+    if (!fpInstance) return;
+    
+    const selectedDates = fpInstance.selectedDates;
+    
+    if (selectedDates.length === 0) {
+      alert("請先在日曆上點選至少一個日期！");
+      return;
+    }
+
+    // 排序日期
+    selectedDates.sort((a, b) => a - b);
+
+    // 迴圈新增設定列
+    selectedDates.forEach(dateObj => {
+      const dateString = flatpickr.formatDate(dateObj, "Y-m-d");
+      addScheduleDateRow(dateString);
+    });
+
+    // 清空日曆選取狀態
+    fpInstance.clear();
+  }
+
+  // 修改：帶入預設日期，並將聚會預設為「主日」
+  function addScheduleDateRow(dateVal = '') {
     const container = document.getElementById('dateSettingsContainer');
     const div = document.createElement('div');
-    div.className = 'card mb-2 p-2 schedule-date-row';
+    div.className = 'card mb-2 p-2 schedule-date-row border-primary border-opacity-25';
+    
     div.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-1">
-        <input type="date" class="form-control form-control-sm s-date w-50 me-1" required>
-        <select class="form-select form-select-sm s-type w-50">
-          <option value="主日崇拜">主日崇拜</option>
+        <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateVal}" required>
+        <select class="form-select form-select-sm s-type w-50 text-primary fw-bold">
+          <option value="主日" selected>主日</option>
           <option value="青年聚會">青年聚會</option>
           <option value="禱告會">禱告會</option>
         </select>
-        <button class="btn btn-sm btn-danger ms-1" onclick="this.closest('.schedule-date-row').remove()">x</button>
+        <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.schedule-date-row').remove()">x</button>
       </div>
       <input type="text" class="form-control form-control-sm s-leave" placeholder="請假人員 (如: 王小明,李大華)">
     `;
