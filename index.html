@@ -675,7 +675,13 @@
   // 4. 牧師與題目與經文設定 (Sermon Tab) 相關邏輯
   // ==========================================
 
-  function initSpreadsheet() {
+// ==========================================
+  // 4. 牧師與題目與經文 (Sermon Tab) 邏輯
+  // ==========================================
+
+  // 初始化並載入現有資料
+  async function initSpreadsheet() {
+    // 1. 初始化試算表
     window.xs = x_spreadsheet('#x-spreadsheet-demo', {
       showToolbar: true,
       showGrid: true,
@@ -684,17 +690,64 @@
         width: () => document.getElementById('sermon').clientWidth - 30, 
       }
     });
-    xs.loadData([{
-      name: '講員排程',
-      rows: {
-        0: { cells: { 0: {text: '日期'}, 1: {text: '牧師'}, 2: {text: '題目'}, 3: {text: '經文'} } }
+
+    // 2. 嘗試從後端讀取現有資料
+    try {
+      const result = await callAPI('getSermonInfo', {});
+      let rowsData = { 0: { cells: { 0: {text: '日期'}, 1: {text: '牧師'}, 2: {text: '題目'}, 3: {text: '經文'} } } };
+      
+      if (result.status === 'success' && result.data.length > 0) {
+        result.data.forEach((row, idx) => {
+          rowsData[idx + 1] = {
+            cells: {
+              0: { text: row['日期'] || '' },
+              1: { text: row['牧師'] || '' },
+              2: { text: row['題目'] || '' },
+              3: { text: row['經文'] || '' }
+            }
+          };
+        });
       }
-    }]);
+
+      window.xs.loadData([{ name: '講員排程', rows: rowsData }]);
+    } catch (e) {
+      console.error("載入講員資料失敗", e);
+    }
   }
 
-  function saveSermonData() {
-    alert("準備儲存牧師與經文資料...");
-  }
-</script>
+  // 儲存邏輯
+  async function saveSermonData() {
+    if (!window.xs) return;
+    
+    const data = window.xs.getData()[0].rows;
+    let finalSermonData = [];
+    const headers = ['日期', '牧師', '題目', '經文'];
+
+    Object.keys(data).forEach(rowIndex => {
+      if (rowIndex === '0' || rowIndex === 'len') return; // 跳過標題與屬性
+      
+      let rowObj = {};
+      let hasData = false;
+      headers.forEach((h, colIndex) => {
+        let text = (data[rowIndex].cells && data[rowIndex].cells[colIndex]) ? data[rowIndex].cells[colIndex].text : '';
+        rowObj[h] = text;
+        if (h === '日期' && text.trim() !== '') hasData = true;
+      });
+      
+      if (hasData) finalSermonData.push(rowObj);
+    });
+
+    if (finalSermonData.length === 0) { alert("請至少填寫一個日期的資料"); return; }
+
+    try {
+      const result = await callAPI('saveSermonInfo', { sermonData: finalSermonData });
+      if (result.status === 'success') {
+        alert("🎉 講員資訊儲存成功！");
+        loadDashboard(); // 順便更新公佈欄
+      }
+    } catch (e) {
+      alert("儲存失敗，請檢查網路。");
+    }
+  }</script>
 </body>
 </html>
