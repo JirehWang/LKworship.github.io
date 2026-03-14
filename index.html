@@ -226,7 +226,7 @@
     if(tabId === 'dashboard') loadDashboard();
     if(tabId === 'settings') loadPositions();
     if(tabId === 'schedule') initScheduleTab();
-    if(tabId === 'sermon' && !window.xs) initSpreadsheet();
+    if(tabId === 'sermon') loadSermonData();
   }
 
   window.onload = () => loadDashboard();
@@ -614,45 +614,120 @@
     }
   }
 
+// ==========================================
+  // 4. 牧師設定邏輯 (Excel 貼上版)
   // ==========================================
-  // 4. 牧師設定邏輯
-  // ==========================================
-  async function initSpreadsheet() {
-    window.xs = x_spreadsheet('#x-spreadsheet-demo', { showToolbar: true, showGrid: true, view: { height: () => 400, width: () => document.getElementById('sermon').clientWidth - 30 } });
+  
+  // 從資料庫載入現有資料
+  async function loadSermonData() {
+    const tbody = document.getElementById('sermonTbody');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted p-4"><div class="spinner-border text-primary"></div></td></tr>';
+    
     try {
       const result = await callAPI('getSermonInfo', {});
-      let rowsData = { 0: { cells: { 0: {text: '日期'}, 1: {text: '牧師'}, 2: {text: '題目'}, 3: {text: '經文'} } } };
+      tbody.innerHTML = '';
       if (result.status === 'success' && result.data.length > 0) {
-        result.data.forEach((row, idx) => {
-          rowsData[idx + 1] = { cells: { 0: { text: row['日期']||'' }, 1: { text: row['牧師']||'' }, 2: { text: row['題目']||'' }, 3: { text: row['經文']||'' } } };
+        result.data.forEach(row => {
+          addSermonRow(row['日期'] || '', row['牧師'] || '', row['題目'] || '', row['經文'] || '');
         });
+      } else {
+        addSermonRow('', '', '', ''); // 如果沒資料，給個空行
       }
-      window.xs.loadData([{ name: '講員排程', rows: rowsData }]);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger p-4">載入失敗，請檢查網路</td></tr>';
+    }
   }
 
-  async function saveSermonData() {
-    if (!window.xs) return;
-    const data = window.xs.getData()[0].rows;
-    let finalSermonData = [];
-    const headers = ['日期', '牧師', '題目', '經文'];
+  // 產生 HTML 列
+  function addSermonRow(date, pastor, title, scripture) {
+    const tbody = document.getElementById('sermonTbody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="date" class="form-control form-control-sm sermon-date" value="${date}"></td>
+      <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}" placeholder="牧師姓名"></td>
+      <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}" placeholder="講道題目"></td>
+      <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}" placeholder="經文章節"></td>
+      <td class="text-center align-middle"><button class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">刪除</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
 
-    Object.keys(data).forEach(rowIndex => {
-      if (rowIndex === '0' || rowIndex === 'len') return; 
-      let rowObj = {}; let hasData = false;
-      headers.forEach((h, colIndex) => {
-        let text = (data[rowIndex].cells && data[rowIndex].cells[colIndex]) ? data[rowIndex].cells[colIndex].text : '';
-        rowObj[h] = text;
-        if (h === '日期' && text.trim() !== '') hasData = true;
-      });
-      if (hasData) finalSermonData.push(rowObj);
+  // 🌟 神奇的 Excel 貼上解析器
+  function handleSermonPaste(e) {
+    e.preventDefault(); // 阻止文字出現在 textarea 裡，保持畫面乾淨
+    
+    // 取得剪貼簿裡的文字
+    let pasteData = (e.clipboardData || window.clipboardData).getData('text');
+    if (!pasteData) return;
+
+    // 用換行符號切出每一列
+    let rows = pasteData.split(/\r?\n/);
+    let addedCount = 0;
+
+    rows.forEach(rowStr => {
+      if (rowStr.trim() === '') return;
+      // Excel 複製出來的欄位會用 Tab (\t) 隔開
+      let cols = rowStr.split('\t');
+      
+      // 智慧防呆：如果使用者不小心把標題也複製進來了，自動略過那一列
+      if (cols[0] && cols[0].includes('日期')) return;
+
+      let date = cols[0] ? cols[0].trim() : '';
+      let pastor = cols[1] ? cols[1].trim() : '';
+      let title = cols[2] ? cols[2].trim() : '';
+      let scripture = cols[3] ? cols[3].trim() : '';
+
+      // 將 YYYY/MM/DD 自動轉成 HTML 認得的 YYYY-MM-DD
+      date = date.replace(/\//g, '-');
+
+      if (date || pastor || title || scripture) {
+        addSermonRow(date, pastor, title, scripture);
+        addedCount++;
+      }
+    });
+    
+    if(addedCount > 0) {
+      // 貼上後把畫面捲動到最下面，方便查看
+      document.getElementById('sermonTbody').lastElementChild.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
+  // 儲存資料回 Google Sheets
+  async function saveSermonData() {
+    const rows = document.querySelectorAll('#sermonTbody tr');
+    let finalSermonData = [];
+
+    rows.forEach(tr => {
+      let date = tr.querySelector('.sermon-date').value;
+      let pastor = tr.querySelector('.sermon-pastor').value.trim();
+      let title = tr.querySelector('.sermon-title').value.trim();
+      let scripture = tr.querySelector('.sermon-scripture').value.trim();
+
+      // 只要有日期就存檔
+      if (date !== '') {
+        finalSermonData.push({ '日期': date, '牧師': pastor, '題目': title, '經文': scripture });
+      }
     });
 
-    if (finalSermonData.length === 0) { alert("請填寫資料"); return; }
+    if (finalSermonData.length === 0) { 
+      alert("請至少填寫一個有效日期的資料"); return; 
+    }
+
+    const btn = event.target;
+    btn.disabled = true; btn.innerText = '儲存中...';
+
     try {
       const result = await callAPI('saveSermonInfo', { sermonData: finalSermonData });
-      if (result.status === 'success') { alert("🎉 講員資訊儲存成功！"); loadDashboard(); }
-    } catch (e) { alert("儲存失敗"); }
+      if (result.status === 'success') { 
+        alert("🎉 講員資訊儲存成功！"); 
+        switchTab('dashboard'); // 存完直接回公佈欄看成果
+      }
+      else alert("儲存失敗：" + result.message);
+    } catch (e) { 
+      alert("網路連線錯誤"); 
+    } finally {
+      btn.disabled = false; btn.innerText = '儲存至資料庫';
+    }
   }
 </script>
 </body>
