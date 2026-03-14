@@ -4,100 +4,119 @@
   <meta charset="UTF-8">
   <title>敬拜團服事排班系統</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/x-data-spreadsheet@1.1.5/dist/xspreadsheet.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   
-<style>
-    body { background-color: #f8f9fa; }
+  <style>
+    body { background-color: #f4f7f6; font-family: "Microsoft JhengHei", sans-serif; }
+    .container { background-color: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-top: 2rem; margin-bottom: 3rem; }
     .tab-content { display: none; padding-top: 20px; }
     .tab-content.active { display: block; }
     
-    /* 公佈欄樣式 */
-    #dashboardTable table th, #dashboardTable table td { text-align: center; vertical-align: middle; white-space: nowrap; }
-    .warning-row { background-color: #fff3cd !important; border-left: 5px solid #ffc107; }
-    
-    /* 預覽表格優化樣式 (重點修改區) */
-    .preview-table-container { 
+    /* ==========================================
+       共通：凍結窗格與自動折行樣式
+       ========================================== */
+    .table-scroll-container { 
       background: white; 
-      border-radius: 12px; 
-      box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
-      overflow-x: auto;  /* 啟用左右橫向捲動 */
+      border-radius: 10px; 
+      overflow-x: auto; /* 啟用左右捲動 */
       border: 1px solid #dee2e6; 
-      max-width: 100%;
+      position: relative;
     }
-    
-    .preview-table {
-      width: max-content; /* 關鍵：讓表格依照內容撐開，絕對不擠壓 */
+
+    .modern-table {
+      width: max-content; /* 內容撐開，不壓縮 */
       min-width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
     }
-    
-    .preview-table th { background-color: #212529; color: white; text-align: center; font-weight: 500; padding: 12px; white-space: nowrap; }
-    .preview-table td { vertical-align: middle; text-align: center; padding: 8px 12px; white-space: nowrap; }
-    
+
+    .modern-table th { 
+      background-color: #343a40; 
+      color: white; 
+      text-align: center; 
+      padding: 15px 10px; 
+      white-space: nowrap; 
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .modern-table td { 
+      vertical-align: middle; 
+      text-align: center; 
+      padding: 12px 10px; 
+      border-bottom: 1px solid #eee;
+      /* 🌟 核心需求：文字折行限制 (約10個中文字) */
+      max-width: 180px; 
+      white-space: normal !important; 
+      word-break: break-all;
+      line-height: 1.5;
+    }
+
     /* --- 凍結第一欄：日期 --- */
-    .preview-table th:nth-child(1), 
-    .preview-table td:nth-child(1) {
+    .modern-table th:nth-child(1), 
+    .modern-table td:nth-child(1) {
       position: sticky;
       left: 0;
-      width: 120px;
-      min-width: 120px;
-      max-width: 120px;
-      z-index: 2;
-      background-color: #fff; /* 必須設白底，才不會看到後面滾動的字 */
-    }
-    
-    /* --- 凍結第二欄：聚會類別 --- */
-    .preview-table th:nth-child(2), 
-    .preview-table td:nth-child(2) {
-      position: sticky;
-      left: 120px; /* 剛好接在第一欄的 120px 後面 */
       width: 110px;
       min-width: 110px;
       max-width: 110px;
-      z-index: 2;
+      z-index: 5;
       background-color: #fff;
-      box-shadow: 3px 0 5px -2px rgba(0,0,0,0.1); /* 加一點右側陰影，讓凍結邊界更立體 */
-    }
-    
-    /* 確保表頭的深色覆蓋在最上層 */
-    .preview-table thead th:nth-child(1), 
-    .preview-table thead th:nth-child(2) {
-      z-index: 3;
-      background-color: #212529;
-    }
-    
-    /* 修復滑鼠移過時的變色效果 */
-    .preview-table tbody tr:hover td:nth-child(1),
-    .preview-table tbody tr:hover td:nth-child(2) {
-      background-color: #f2f2f2;
     }
 
-    /* 下拉選單樣式優化 */
-    .preview-table .form-select { 
-      border: 1px solid #ced4da; 
-      transition: all 0.2s; 
-      cursor: pointer; 
-      min-width: 110px; /* 確保下拉選單夠寬，名字不會被折行 */
+    /* --- 凍結第二欄：聚會類別 --- */
+    .modern-table th:nth-child(2), 
+    .modern-table td:nth-child(2) {
+      position: sticky;
+      left: 110px; /* 剛好接在第一欄的寬度後面 */
+      width: 100px;
+      min-width: 100px;
+      max-width: 100px;
+      z-index: 5;
+      background-color: #fff;
+      box-shadow: 3px 0 5px -2px rgba(0,0,0,0.1); /* 右側陰影 */
     }
-    .preview-table .form-select:hover { border-color: #0d6efd; }
-    .select-danger { background-color: #ffe6e6 !important; border-color: #dc3545 !important; color: #dc3545 !important; font-weight: bold; }
+
+    /* 確保深色表頭在凍結區也是深色 */
+    .modern-table thead th:nth-child(1), 
+    .modern-table thead th:nth-child(2) {
+      z-index: 15;
+      background-color: #343a40;
+    }
+
+    /* 滑鼠移過整列變色 */
+    .modern-table tbody tr:hover td { background-color: #f8f9fa; }
+
+    .warning-row { background-color: #fff8e1 !important; }
+    .warning-text { color: #f57c00; font-size: 0.85em; font-weight: bold; margin-top: 4px; display: block; }
+    
+    /* 下拉選單與輸入框樣式 */
+    .modern-table .form-select, .modern-table input[type="text"] { 
+      border: 1px solid #ced4da; transition: all 0.2s; min-width: 110px; text-align: center;
+    }
+    .modern-table .form-select:hover { border-color: #0d6efd; }
+    .select-danger { background-color: #ffebee !important; color: #c62828 !important; font-weight: bold; border-color: #ef5350 !important; }
   </style>
 </head>
 <body>
 
-<div class="container mt-4 mb-5 bg-white p-4 rounded-4 shadow-sm">
-  <h2 class="mb-4">敬拜團服事排班系統 <span class="badge bg-primary fs-6">Pro</span></h2>
+<div class="container">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="text-primary fw-bold mb-0">敬拜團服事管理系統 <span class="badge bg-dark fs-6 ms-2">Pro</span></h2>
+    <span class="text-muted small">最後同步：<span id="syncTime">--:--</span></span>
+  </div>
   
-  <ul class="nav nav-tabs" id="myTab">
-    <li class="nav-item"><a class="nav-link active fw-bold" href="#" onclick="switchTab('dashboard')">公佈欄</a></li>
-    <li class="nav-item"><a class="nav-link fw-bold" href="#" onclick="switchTab('settings')">位置設定與人員</a></li>
-    <li class="nav-item"><a class="nav-link fw-bold" href="#" onclick="switchTab('schedule')">服事安排</a></li>
-    <li class="nav-item"><a class="nav-link fw-bold" href="#" onclick="switchTab('sermon')">牧師與題目設定</a></li>
+  <ul class="nav nav-pills mb-4 shadow-sm p-2 rounded-pill bg-light" id="myTab">
+    <li class="nav-item"><a class="nav-link active rounded-pill fw-bold" href="#" onclick="switchTab('dashboard')">📢 公佈欄總表</a></li>
+    <li class="nav-item"><a class="nav-link rounded-pill fw-bold" href="#" onclick="switchTab('settings')">⚙️ 位置與人員</a></li>
+    <li class="nav-item"><a class="nav-link rounded-pill fw-bold" href="#" onclick="switchTab('schedule')">🗓️ 服事安排預覽</a></li>
+    <li class="nav-item"><a class="nav-link rounded-pill fw-bold" href="#" onclick="switchTab('sermon')">📖 牧師題目快速登錄</a></li>
   </ul>
 
   <div id="dashboard" class="tab-content active">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h4>公佈欄</h4>
+      <h5 class="fw-bold text-dark mb-0">季度服事表</h5>
       <div class="d-flex align-items-center">
         <label class="form-label me-2 mb-0 fw-bold">選擇季度：</label>
         <select id="quarterSelect" class="form-select w-auto" onchange="loadDashboard()">
@@ -108,92 +127,93 @@
         </select>
       </div>
     </div>
-    <div class="alert alert-light border">
-      💡 系統會自動抓取已發布的班表。若出現 <span class="badge bg-warning text-dark">⚠️ 警告</span> 標記，代表排班有違規情況。
+    <div class="alert alert-light border border-warning border-opacity-50">
+      💡 若出現 <span class="badge bg-warning text-dark">⚠️ 警告</span> 標記，代表該日排班有違規情況（如連任或同一天重複排班）。
     </div>
-    <div id="dashboardTable">
-      <div class="text-center text-muted my-5">請選擇季度以載入資料...</div>
+    
+    <div class="table-scroll-container" id="dashboardContainer">
+      <div class="text-center text-muted p-5">請選擇季度以載入資料...</div>
     </div> 
   </div>
 
   <div id="settings" class="tab-content">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h4>位置設定與人員</h4>
-      <button class="btn btn-primary" onclick="savePositionsToServer()">儲存設定</button>
+      <h5 class="fw-bold">位置與候選名單設定</h5>
+      <button class="btn btn-primary px-4 fw-bold" onclick="savePositionsToServer()">儲存設定</button>
     </div>
-    <table class="table table-bordered table-hover">
-      <thead class="table-light">
-        <tr>
-          <th style="width: 5%; text-align: center;">↕️</th> 
-          <th style="width: 20%">位置名稱 (如: 主領)</th>
-          <th style="width: 50%">人員名單</th>
-          <th style="width: 15%">是否必排</th>
-          <th style="width: 10%; text-align: center;">操作</th>
-        </tr>
-      </thead>
-      <tbody id="positionsTbody"></tbody>
-    </table>
-    <button class="btn btn-outline-secondary w-100" onclick="addPositionRow('', '')">+ 新增一個位置</button>
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle table-hover">
+        <thead class="table-light text-center">
+          <tr>
+            <th style="width: 50px;">↕️</th> 
+            <th style="width: 20%;">位置名稱</th>
+            <th style="width: 50%;">人員名單 (逗號分隔)</th>
+            <th style="width: 15%;">是否必排</th>
+            <th style="width: 80px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="positionsTbody"></tbody>
+      </table>
+    </div>
+    <button class="btn btn-outline-secondary w-100 fw-bold" onclick="addPositionRow('', '', '是')">+ 新增一個位置</button>
   </div>
 
   <div id="schedule" class="tab-content">
     <div class="row">
-      <div class="col-md-3 border-end">
-        <h5 class="mb-3 text-primary">1. 產生全新排班</h5>
-        <div class="mb-3 p-2 bg-light border rounded">
-          <label class="form-label fw-bold">挑選排班日期：</label>
+      <div class="col-md-3">
+        <div class="card p-3 border-0 bg-light mb-3 shadow-sm">
+          <label class="fw-bold text-primary mb-2">1. 產生全新排班</label>
           <input type="text" id="multiDatePicker" class="form-control mb-2 bg-white" placeholder="點此打開日曆多選...">
-          <button class="btn btn-primary w-100" onclick="addSelectedDates()">確認新增日期</button>
+          <button class="btn btn-sm btn-primary w-100 fw-bold" onclick="addSelectedDates()">確認新增日期</button>
+          
+          <div id="dateSettingsContainer" class="mt-3" style="max-height: 250px; overflow-y: auto;"></div>
+          <button class="btn btn-danger w-100 mt-3 fw-bold" onclick="generateSchedule()">產生排班預覽 🚀</button>
         </div>
-        <div id="dateSettingsContainer" style="max-height: 400px; overflow-y: auto;"></div>
-        <button class="btn btn-primary w-100 mt-2 mb-4 fw-bold" onclick="generateSchedule()">產生排班預覽 🚀</button>
-        <hr>
-        <h5 class="mb-3 text-success">2. 讀取現有排班</h5>
-        <div class="p-2 border border-success border-opacity-50 rounded bg-success bg-opacity-10">
+        
+        <div class="card p-3 border-0 bg-success bg-opacity-10 shadow-sm">
+          <label class="fw-bold text-success mb-2">2. 讀取現有排班</label>
           <input type="date" id="editStartDate" class="form-control form-control-sm mb-1">
           <input type="date" id="editEndDate" class="form-control form-control-sm mb-2">
-          <button class="btn btn-success w-100 fw-bold" onclick="loadExistingSchedule()">讀取資料 📥</button>
+          <button class="btn btn-sm btn-success w-100 fw-bold" onclick="loadExistingSchedule()">讀取資料 📥</button>
         </div>
       </div>
 
       <div class="col-md-9">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="mb-0 text-primary">排班預覽 (可直接點擊下拉選單修改)</h5>
-          <button class="btn btn-success fw-bold px-4" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存至資料庫</button>
+          <h5 class="fw-bold text-primary mb-0">排班預覽編輯 (支援下拉選單與同日防呆)</h5>
+          <button class="btn btn-success fw-bold px-4 shadow-sm" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存並發佈</button>
         </div>
         
-        <div class="preview-table-container" id="previewContainer" style="display: none;">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0 preview-table" id="previewTable">
-              <thead id="previewThead"></thead>
-              <tbody id="previewTbody"></tbody>
-            </table>
-          </div>
+        <div class="table-scroll-container" id="previewContainer" style="display: none;">
+          <table class="modern-table">
+            <thead id="previewThead"></thead>
+            <tbody id="previewTbody"></tbody>
+          </table>
         </div>
         
-        <div id="previewPlaceholder" class="text-center text-muted mt-5 p-5 bg-light rounded border">
-          <h5 class="text-secondary">請先在左側點擊「產生排班預覽」或「讀取資料」</h5>
+        <div id="previewPlaceholder" class="text-center text-muted mt-4 p-5 bg-light rounded-3 border">
+          <h5 class="text-secondary">請先在左側設定條件並產生預覽</h5>
         </div>
       </div>
     </div>
   </div>
 
-<div id="sermon" class="tab-content">
+  <div id="sermon" class="tab-content">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h4>📖 牧師、題目與經文登錄</h4>
+      <h5 class="fw-bold">📖 牧師、題目與經文快速登錄</h5>
       <button class="btn btn-success fw-bold px-4" onclick="saveSermonData()">儲存至資料庫</button>
     </div>
 
     <div class="alert alert-info shadow-sm border-0">
-      💡 <strong>快速匯入秘訣：</strong>請在 Excel 複製 <strong>[日期, 牧師, 題目, 經文]</strong> 這四個欄位，點擊下方輸入框並按下 <code>Ctrl + V</code> 貼上，系統會自動為您轉換成表格！
+      💡 <strong>快速匯入秘訣：</strong>在 Excel 複製 <strong>[日期, 牧師, 題目, 經文]</strong>，點擊下方輸入框按下 <code>Ctrl + V</code> 貼上，系統會自動轉換。若日期相同，會<strong>自動覆蓋舊資料</strong>！
     </div>
 
-    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light" rows="2" 
+    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light shadow-sm" rows="2" 
       placeholder="📋 點擊這裡，然後貼上 Excel 資料..." onpaste="handleSermonPaste(event)"></textarea>
 
-    <div class="table-responsive preview-table-container">
-      <table class="table table-hover mb-0 preview-table">
-        <thead class="table-dark">
+    <div class="table-responsive bg-white rounded-3 shadow-sm border mb-3">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-dark text-center">
           <tr>
             <th style="width: 15%">日期</th>
             <th style="width: 15%">牧師</th>
@@ -206,11 +226,10 @@
           </tbody>
       </table>
     </div>
-    <button class="btn btn-outline-secondary w-100 fw-bold mt-2" onclick="addSermonRow('', '', '', '')">+ 手動新增一列</button>
+    <button class="btn btn-outline-secondary w-100 fw-bold" onclick="addSermonRow('', '', '', '')">+ 手動新增一列</button>
   </div>
 </div>
 
-<script src="https://unpkg.com/x-data-spreadsheet@1.1.5/dist/xspreadsheet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/zh.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script> 
@@ -229,7 +248,10 @@
     if(tabId === 'sermon') loadSermonData();
   }
 
-  window.onload = () => loadDashboard();
+  window.onload = () => {
+    document.getElementById('syncTime').innerText = new Date().toLocaleTimeString();
+    loadDashboard();
+  };
 
   async function callAPI(action, payload) {
     const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: action, ...payload }) });
@@ -237,68 +259,67 @@
   }
 
   // ==========================================
-  // 1. 公佈欄邏輯
+  // 1. 公佈欄邏輯 (完美排序與折行版)
   // ==========================================
   async function loadDashboard() {
-    const container = document.getElementById('dashboardTable');
-    container.innerHTML = '<div class="text-center text-muted my-5"><h5>正在載入最新班表...</h5><div class="spinner-border text-primary mt-2"></div></div>';
+    const container = document.getElementById('dashboardContainer');
+    container.innerHTML = '<div class="text-center p-5 text-primary"><div class="spinner-border"></div><div class="mt-2">正在載入最新班表...</div></div>';
     const [year, quarter] = document.getElementById('quarterSelect').value.split('-');
 
     try {
       const result = await callAPI('getSchedule', { year, quarter });
-      if (result.status === 'success') renderDashboardTable(result.data);
-      else container.innerHTML = `<div class="alert alert-danger">載入失敗：${result.message}</div>`;
+      if (result.status === 'success') {
+        document.getElementById('syncTime').innerText = new Date().toLocaleTimeString();
+        renderDashboardTable(result.data);
+      } else {
+        container.innerHTML = `<div class="alert alert-danger m-3">載入失敗：${result.message}</div>`;
+      }
     } catch (error) {
-      container.innerHTML = `<div class="alert alert-danger">網路連線錯誤！</div>`;
+      container.innerHTML = `<div class="alert alert-danger m-3">網路連線錯誤！</div>`;
     }
   }
 
   function renderDashboardTable(data) {
-    const container = document.getElementById('dashboardTable');
-    container.innerHTML = '';
+    const container = document.getElementById('dashboardContainer');
     if (!data || data.length === 0) {
-      container.innerHTML = '<div class="alert alert-warning text-center my-4">該季度目前沒有資料。</div>';
+      container.innerHTML = '<div class="alert alert-warning text-center m-4">該季度目前沒有排班資料。</div>';
       return;
     }
 
-    let ignoreKeys = ['hasWarning', 'warningMessage', '年度', '季度'];
-    let headers = Object.keys(data[0]).filter(k => !ignoreKeys.includes(k));
+    // 🌟 定義欄位強制順序
+    const fixedHeaders = ['日期', '聚會類別', '牧師', '題目', '經文'];
+    const allKeys = Object.keys(data[0]);
+    // 過濾掉系統保留字元與已固定的標題，剩下的就是服事位置
+    const dynamicHeaders = allKeys.filter(k => !fixedHeaders.includes(k) && !['hasWarning', 'warningMessage', '年度', '季度'].includes(k));
+    const finalHeaders = [...fixedHeaders, ...dynamicHeaders];
 
-    let table = document.createElement('table');
-    table.className = 'table table-bordered table-hover align-middle shadow-sm bg-white';
-    table.style.fontSize = '0.9em';
+    let html = `<table class="modern-table"><thead><tr>`;
+    finalHeaders.forEach(h => html += `<th>${h}</th>`);
+    html += `</tr></thead><tbody>`;
 
-    let thead = document.createElement('thead');
-    thead.className = 'table-dark';
-    let trHead = document.createElement('tr');
-    headers.forEach(h => { let th = document.createElement('th'); th.innerText = h; trHead.appendChild(th); });
-    thead.appendChild(trHead);
-    table.appendChild(thead);
-
-    let tbody = document.createElement('tbody');
     data.forEach(row => {
-      let tr = document.createElement('tr');
-      if (row.hasWarning) tr.classList.add('warning-row');
-
-      headers.forEach(h => {
-        let td = document.createElement('td');
-        let cellText = row[h] || '';
-        if (h === '日期' && row.hasWarning) {
-          td.innerHTML = `<strong>${cellText}</strong><br><span class="badge bg-warning text-dark mt-1 text-wrap">${row.warningMessage}</span>`;
+      html += `<tr class="${row.hasWarning ? 'warning-row' : ''}">`;
+      
+      finalHeaders.forEach(h => {
+        let val = row[h] || '';
+        
+        if (h === '日期') {
+          html += `<td><strong>${val}</strong>`;
+          if (row.hasWarning) {
+            html += `<span class="warning-text">⚠️ ${row.warningMessage}</span>`;
+          }
+          html += `</td>`;
         } else {
-          td.innerText = cellText;
-          if(cellText === '' || cellText === '【待定】') td.classList.add('text-muted');
-          if(cellText === '【待定】') td.style.color = '#dc3545';
+          // 若為待定，字體標紅
+          let extraClass = (val === '【待定】') ? 'text-danger fw-bold' : '';
+          let displayVal = (val === '') ? '<span class="text-black-50">-</span>' : val;
+          html += `<td class="${extraClass}">${displayVal}</td>`;
         }
-        tr.appendChild(td);
       });
-      tbody.appendChild(tr);
+      html += `</tr>`;
     });
-    table.appendChild(tbody);
-    let responsiveDiv = document.createElement('div');
-    responsiveDiv.className = 'table-responsive';
-    responsiveDiv.appendChild(table);
-    container.appendChild(responsiveDiv);
+    html += `</tbody></table>`;
+    container.innerHTML = html;
   }
 
   // ==========================================
@@ -323,16 +344,16 @@
     const tbody = document.getElementById('positionsTbody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="text-center align-middle drag-handle" style="cursor: grab; font-size: 1.2em; color: #888;">☰</td>
-      <td><input type="text" class="form-control pos-name" value="${posName}"></td>
-      <td><input type="text" class="form-control pos-personnel" value="${personnel}"></td>
+      <td class="text-center align-middle drag-handle" style="cursor: grab; font-size: 1.2em; color: #adb5bd;">☰</td>
+      <td><input type="text" class="form-control form-control-sm pos-name text-center" value="${posName}"></td>
+      <td><input type="text" class="form-control form-control-sm pos-personnel" value="${personnel}" placeholder="如：張三,李四"></td>
       <td>
-        <select class="form-select pos-required">
+        <select class="form-select form-select-sm pos-required text-center">
           <option value="是" ${isRequired === "是" ? "selected" : ""}>必排</option>
           <option value="否" ${isRequired === "否" ? "selected" : ""}>非必排</option>
         </select>
       </td>
-      <td class="text-center align-middle"><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button></td>
+      <td class="text-center align-middle"><button class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button></td>
     `;
     tbody.appendChild(tr);
   }
@@ -350,12 +371,12 @@
     const saveBtn = event.target;
     saveBtn.disabled = true; saveBtn.innerText = "儲存中...";
     await callAPI('savePositions', { positionsData });
-    alert("設定已成功儲存！");
+    alert("✅ 設定已成功儲存！");
     saveBtn.disabled = false; saveBtn.innerText = "儲存設定";
   }
 
   // ==========================================
-  // 3. 服事安排 (全新視覺化下拉選單版)
+  // 3. 服事安排 (自動排班引擎 + 預覽渲染)
   // ==========================================
   let currentPositions = []; 
   let generatedScheduleData = []; 
@@ -368,7 +389,7 @@
   }
 
   function addSelectedDates() {
-    if (!fpInstance || fpInstance.selectedDates.length === 0) return;
+    if (!fpInstance || fpInstance.selectedDates.length === 0) { alert("請先點選日期"); return; }
     const selectedDates = fpInstance.selectedDates.sort((a, b) => a - b);
     selectedDates.forEach(dateObj => {
       const dateString = flatpickr.formatDate(dateObj, "Y-m-d");
@@ -377,10 +398,10 @@
       div.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-1">
           <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateString}" required>
-          <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold" value="主日" placeholder="聚會類別">
+          <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold text-center" value="主日" placeholder="聚會類別">
           <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.card').remove()">x</button>
         </div>
-        <input type="text" class="form-control form-control-sm s-leave" placeholder="請假人員 (如: 王小明,李大華)">
+        <input type="text" class="form-control form-control-sm s-leave text-center" placeholder="請假人員 (用逗號隔開)">
       `;
       document.getElementById('dateSettingsContainer').appendChild(div);
     });
@@ -388,27 +409,27 @@
   }
 
   function getQuarter(dateString) {
-    const q = Math.floor((new Date(dateString).getMonth() + 3) / 3);
-    return `Q${q}`;
+    return `Q${Math.floor((new Date(dateString).getMonth() + 3) / 3)}`;
   }
 
   function generateSchedule() {
-    if (currentPositions.length === 0) { alert("請先建立位置資料！"); return; }
+    if (currentPositions.length === 0) { alert("請先至設定頁建立位置資料！"); return; }
     const rows = document.querySelectorAll('.schedule-date-row, #dateSettingsContainer .card');
     let inputConditions = [];
     rows.forEach(row => {
       const dateVal = row.querySelector('.s-date').value;
       if (dateVal) {
         inputConditions.push({
-          date: dateVal, type: row.querySelector('.s-type').value,
+          date: dateVal, type: row.querySelector('.s-type').value.trim(),
           leaves: row.querySelector('.s-leave').value.split(',').map(s=>s.trim()).filter(s=>s) 
         });
       }
     });
 
-    if (inputConditions.length === 0) { alert("請設定日期！"); return; }
+    if (inputConditions.length === 0) { alert("請設定至少一天日期！"); return; }
     inputConditions.sort((a, b) => a.date.localeCompare(b.date));
 
+    // 演算法變數初始化
     let leaderObj = currentPositions.find(p => p.positionName === '主領');
     let leaderMasterList = leaderObj ? leaderObj.personnel.split(',').map(s=>s.trim()).filter(s=>s) : [];
     let leaderPool = []; 
@@ -470,34 +491,26 @@
       else {
         generatedScheduleData = result.data; 
         renderPreviewTable(generatedScheduleData);
-        alert(`✅ 讀取了 ${result.data.length} 天的排班資料！`);
+        alert(`✅ 讀取了 ${result.data.length} 天的排班資料！\n請在右側修改後點擊「儲存並發佈」。`);
       }
     } else alert("讀取失敗：" + result.message);
     
     btn.disabled = false; btn.innerText = "讀取資料 📥";
   }
 
-// --- HTML 預覽表格與下拉選單渲染 (加入同日重複防呆警告) ---
+  // --- HTML 預覽表格與下拉選單渲染 (同日重複防呆) ---
   function renderPreviewTable(data) {
     const container = document.getElementById('previewContainer');
     const thead = document.getElementById('previewThead');
     const tbody = document.getElementById('previewTbody');
-    const placeholder = document.getElementById('previewPlaceholder');
-    const saveBtn = document.getElementById('saveScheduleBtn');
-
+    
     thead.innerHTML = ''; tbody.innerHTML = '';
 
-    // 產生表頭：日期、聚會類別，後面接所有的位置名稱
     let headers = ['日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
     let trHead = document.createElement('tr');
-    headers.forEach(h => {
-      let th = document.createElement('th');
-      th.innerText = h;
-      trHead.appendChild(th);
-    });
+    headers.forEach(h => { let th = document.createElement('th'); th.innerText = h; trHead.appendChild(th); });
     thead.appendChild(trHead);
 
-    // 產生內容列與下拉選單
     data.forEach((row, rowIndex) => {
       let tr = document.createElement('tr');
       
@@ -505,26 +518,23 @@
         let td = document.createElement('td');
         
         if (h === '日期') {
-          // 日期唯讀顯示
           td.innerHTML = `<span class="badge bg-secondary fs-6 shadow-sm">${row[h]}</span>`;
         } 
         else if (h === '聚會類別') {
-          // 聚會類別使用手動輸入框
           let input = document.createElement('input');
           input.type = 'text';
-          input.className = 'form-control form-control-sm text-center border-1 border-secondary border-opacity-25';
+          input.className = 'form-control form-control-sm text-center border-0 bg-transparent fw-bold text-primary';
           input.value = row[h] || '';
           input.onchange = (e) => { generatedScheduleData[rowIndex][h] = e.target.value.trim(); };
           td.appendChild(input);
         } 
         else {
-          // 各個位置使用下拉選單
           let posDef = currentPositions.find(p => p.positionName === h);
           let candidates = posDef ? posDef.personnel.split(',').map(s=>s.trim()).filter(s=>s) : [];
           let isReq = posDef ? (posDef.isRequired || '是') : '是';
 
           let select = document.createElement('select');
-          select.className = 'form-select form-select-sm text-center';
+          select.className = 'form-select form-select-sm text-center bg-transparent border-0';
           
           if(row[h] === '【待定】') select.classList.add('select-danger');
 
@@ -533,7 +543,6 @@
           optDefault.text = (isReq === '是') ? '【待定】' : '無';
           select.appendChild(optDefault);
 
-          // 專屬該位置的人員名單
           candidates.forEach(c => {
             let opt = document.createElement('option');
             opt.value = c; opt.text = c;
@@ -541,46 +550,35 @@
             select.appendChild(opt);
           });
 
-          // 紀錄「改變前」的值，如果使用者取消警告，可以退回原本的值
           let previousValue = row[h] || (isReq === '是' ? '【待定】' : '');
 
           select.onchange = function() {
             let newValue = this.value;
 
-            // 🌟 核心防呆邏輯：檢查同一天是否有重複的人
             if (newValue !== '' && newValue !== '【待定】') {
               let duplicateRoles = [];
               let dayData = generatedScheduleData[rowIndex];
               
-              // 掃描這一天所有的位置，看看這個人是不是已經在其他位置了
               currentPositions.forEach(pos => {
                 let checkPosName = pos.positionName;
-                // 排除自己目前正在改的這個位置
                 if (checkPosName !== h && dayData[checkPosName] === newValue) {
                   duplicateRoles.push(checkPosName);
                 }
               });
 
-              // 如果發現他已經在其他位置，跳出警告確認視窗
               if (duplicateRoles.length > 0) {
-                let confirmMsg = `⚠️ 警告：\n[${newValue}] 在這一天已經被安排了【${duplicateRoles.join('、')}】。\n\n確定要讓他同時擔任【${h}】嗎？`;
-                
-                if (!confirm(confirmMsg)) {
-                  // 使用者按了「取消」：退回原本的選項
+                if (!confirm(`⚠️ 警告：\n[${newValue}] 在這天已被安排【${duplicateRoles.join('、')}】。\n\n確定讓他同時擔任【${h}】嗎？`)) {
                   this.value = previousValue;
-                  // 恢復顏色設定
                   if (previousValue === '【待定】') this.classList.add('select-danger');
                   else this.classList.remove('select-danger');
-                  return; // 終止後續的儲存動作
+                  return; 
                 }
               }
             }
 
-            // 若無重複，或使用者堅持要排，則更新資料
             generatedScheduleData[rowIndex][h] = newValue;
-            previousValue = newValue; // 將當前的值設為下一次的「改變前的值」
+            previousValue = newValue; 
             
-            // 處理紅色待定樣式
             if (newValue === '【待定】') this.classList.add('select-danger');
             else this.classList.remove('select-danger');
           };
@@ -591,11 +589,11 @@
       tbody.appendChild(tr);
     });
 
-    placeholder.style.display = 'none';
+    document.getElementById('previewPlaceholder').style.display = 'none';
     container.style.display = 'block';
-    saveBtn.style.display = 'inline-block';
+    document.getElementById('saveScheduleBtn').style.display = 'inline-block';
   }
-  
+
   async function saveGeneratedSchedule() {
     if (generatedScheduleData.length === 0) return;
     const btn = document.getElementById('saveScheduleBtn');
@@ -604,21 +602,20 @@
     try {
       const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
       if (result.status === 'success') {
-        alert("🎉 排班表已成功儲存！");
+        alert("🎉 排班表已成功發佈！");
         switchTab('dashboard'); 
       } else alert("儲存失敗：" + result.message);
     } catch (error) {
       alert("網路連線錯誤！");
     } finally {
-      btn.disabled = false; btn.innerText = '儲存至資料庫';
+      btn.disabled = false; btn.innerText = '儲存並發佈';
     }
   }
 
-// ==========================================
-  // 4. 牧師設定邏輯 (Excel 貼上版)
+  // ==========================================
+  // 4. 牧師設定邏輯 (Excel 貼上 + 自動覆蓋版)
   // ==========================================
   
-  // 從資料庫載入現有資料
   async function loadSermonData() {
     const tbody = document.getElementById('sermonTbody');
     tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted p-4"><div class="spinner-border text-primary"></div></td></tr>';
@@ -631,44 +628,35 @@
           addSermonRow(row['日期'] || '', row['牧師'] || '', row['題目'] || '', row['經文'] || '');
         });
       } else {
-        addSermonRow('', '', '', ''); // 如果沒資料，給個空行
+        addSermonRow('', '', '', ''); 
       }
     } catch (e) {
       tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger p-4">載入失敗，請檢查網路</td></tr>';
     }
   }
 
-  // 產生 HTML 列
   function addSermonRow(date, pastor, title, scripture) {
     const tbody = document.getElementById('sermonTbody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input type="date" class="form-control form-control-sm sermon-date" value="${date}"></td>
-      <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}" placeholder="牧師姓名"></td>
-      <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}" placeholder="講道題目"></td>
-      <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}" placeholder="經文章節"></td>
-      <td class="text-center align-middle"><button class="btn btn-sm btn-danger" onclick="this.closest('tr').remove()">刪除</button></td>
+      <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}" placeholder="姓名"></td>
+      <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}" placeholder="題目"></td>
+      <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}" placeholder="章節"></td>
+      <td class="text-center align-middle"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">刪除</button></td>
     `;
     tbody.appendChild(tr);
   }
 
-  // 🌟 神奇的 Excel 貼上解析器
-// 🌟 神奇的 Excel 貼上解析器 (具備自動覆蓋重複日期功能)
   function handleSermonPaste(e) {
     e.preventDefault(); 
-    
     let pasteData = (e.clipboardData || window.clipboardData).getData('text');
     if (!pasteData) return;
 
     let rows = pasteData.split(/\r?\n/);
-    let updatedCount = 0;
-    let newCount = 0;
-
     rows.forEach(rowStr => {
       if (rowStr.trim() === '') return;
       let cols = rowStr.split('\t');
-      
-      // 跳過標題列
       if (cols[0] && cols[0].includes('日期')) return;
 
       let date = cols[0] ? cols[0].trim().replace(/\//g, '-') : '';
@@ -678,40 +666,31 @@
 
       if (!date) return;
 
-      // --- 核心邏輯：檢查畫面上是否已有該日期 ---
       const existingRows = document.querySelectorAll('#sermonTbody tr');
       let foundExisting = false;
 
       for (let tr of existingRows) {
         let dateInput = tr.querySelector('.sermon-date');
         if (dateInput && dateInput.value === date) {
-          // 找到了！直接覆蓋這一行的內容
           tr.querySelector('.sermon-pastor').value = pastor;
           tr.querySelector('.sermon-title').value = title;
           tr.querySelector('.sermon-scripture').value = scripture;
-          
-          // 加上一個短暫的黃色閃爍動畫，提示使用者這一行被更新了
+          tr.style.transition = 'background-color 0.5s';
           tr.style.backgroundColor = '#fff3cd';
           setTimeout(() => { tr.style.backgroundColor = ''; }, 1000);
-          
           foundExisting = true;
-          updatedCount++;
           break;
         }
       }
 
-      // 如果畫面上沒找到該日期，才新增一列
-      if (!foundExisting) {
-        addSermonRow(date, pastor, title, scripture);
-        newCount++;
-      }
+      if (!foundExisting) addSermonRow(date, pastor, title, scripture);
     });
-
-    // 提示使用者處理結果
-    console.log(`貼上完成：更新 ${updatedCount} 筆，新增 ${newCount} 筆。`);
+    
+    // 清空貼上區，保持乾淨
+    e.target.value = '';
+    document.getElementById('sermonTbody').lastElementChild.scrollIntoView({ behavior: 'smooth' });
   }
   
-  // 儲存資料回 Google Sheets
   async function saveSermonData() {
     const rows = document.querySelectorAll('#sermonTbody tr');
     let finalSermonData = [];
@@ -722,15 +701,12 @@
       let title = tr.querySelector('.sermon-title').value.trim();
       let scripture = tr.querySelector('.sermon-scripture').value.trim();
 
-      // 只要有日期就存檔
       if (date !== '') {
         finalSermonData.push({ '日期': date, '牧師': pastor, '題目': title, '經文': scripture });
       }
     });
 
-    if (finalSermonData.length === 0) { 
-      alert("請至少填寫一個有效日期的資料"); return; 
-    }
+    if (finalSermonData.length === 0) { alert("請至少填寫一個有效日期的資料"); return; }
 
     const btn = event.target;
     btn.disabled = true; btn.innerText = '儲存中...';
@@ -738,10 +714,9 @@
     try {
       const result = await callAPI('saveSermonInfo', { sermonData: finalSermonData });
       if (result.status === 'success') { 
-        alert("🎉 講員資訊儲存成功！"); 
-        switchTab('dashboard'); // 存完直接回公佈欄看成果
-      }
-      else alert("儲存失敗：" + result.message);
+        alert("✅ 講員資訊儲存成功！"); 
+        switchTab('dashboard'); 
+      } else alert("儲存失敗：" + result.message);
     } catch (e) { 
       alert("網路連線錯誤"); 
     } finally {
