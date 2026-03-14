@@ -12,7 +12,7 @@
     .tab-content.active { display: block; }
     #schedule-spreadsheet { width: 100%; overflow: hidden; } 
     /* 讓公佈欄表格的文字置中且垂直對齊 */
-    #dashboardTable table th, #dashboardTable table td { text-align: center; vertical-align: middle; }
+    #dashboardTable table th, #dashboardTable table td { text-align: center; vertical-align: middle; white-space: nowrap; }
     /* 警告行的特殊高亮 */
     .warning-row { background-color: #fff3cd !important; border-left: 5px solid #ffc107; }
   </style>
@@ -20,7 +20,7 @@
 <body>
 
 <div class="container mt-4 mb-5">
-  <h2 class="mb-4">敬拜團服事排班系統</h2>
+  <h2 class="mb-4">敬拜團服事排班系統 <span class="badge bg-dark fs-6">v2.0</span></h2>
   
   <ul class="nav nav-tabs" id="myTab">
     <li class="nav-item"><a class="nav-link active" href="#" onclick="switchTab('dashboard')">公佈欄</a></li>
@@ -67,8 +67,9 @@
       <thead class="table-light">
         <tr>
           <th style="width: 5%; text-align: center;">↕️</th> 
-          <th style="width: 25%">位置名稱 (如: 主領)</th>
-          <th style="width: 60%">人員名單</th>
+          <th style="width: 20%">位置名稱 (如: 主領)</th>
+          <th style="width: 50%">人員名單</th>
+          <th style="width: 15%">是否必排</th>
           <th style="width: 10%; text-align: center;">操作</th>
         </tr>
       </thead>
@@ -138,9 +139,11 @@
   </div>
 
   <div id="sermon" class="tab-content">
-    <h4>牧師與題目與經文設定</h4>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4>牧師與題目與經文設定</h4>
+      <button class="btn btn-success" onclick="saveSermonData()">儲存至資料庫</button>
+    </div>
     <div id="x-spreadsheet-demo"></div>
-    <button class="btn btn-success mt-3" onclick="saveSermonData()">儲存至資料庫</button>
   </div>
 </div>
 
@@ -190,7 +193,6 @@
     const selectedVal = document.getElementById('quarterSelect').value;
     if (!selectedVal) return;
 
-    // 將 "2026-Q1" 拆解為 "2026" 和 "Q1"
     const [year, quarter] = selectedVal.split('-');
 
     try {
@@ -214,7 +216,6 @@
       return;
     }
 
-    // 取得要顯示的標題列 (排除後端傳來的系統用屬性)
     let ignoreKeys = ['hasWarning', 'warningMessage', '年度', '季度'];
     let headers = Object.keys(data[0]).filter(k => !ignoreKeys.includes(k));
 
@@ -222,7 +223,6 @@
     table.className = 'table table-bordered table-hover align-middle shadow-sm';
     table.style.fontSize = '0.9em';
 
-    // 產生表頭
     let thead = document.createElement('thead');
     thead.className = 'table-primary';
     let trHead = document.createElement('tr');
@@ -234,12 +234,10 @@
     thead.appendChild(trHead);
     table.appendChild(thead);
 
-    // 產生表格內容
     let tbody = document.createElement('tbody');
     data.forEach(row => {
       let tr = document.createElement('tr');
 
-      // 如果這列有警告，套用醒目的 CSS Class
       if (row.hasWarning) {
         tr.classList.add('warning-row');
       }
@@ -248,7 +246,6 @@
         let td = document.createElement('td');
         let cellText = row[h] || '';
         
-        // 如果是在「日期」欄位且該行有警告，顯示具體警告訊息
         if (h === '日期' && row.hasWarning) {
           td.innerHTML = `
             <strong>${cellText}</strong><br>
@@ -257,10 +254,9 @@
             </span>
           `;
         } else {
-          // 一般欄位直接顯示文字
           td.innerText = cellText;
-          // 若為空值可稍微淡化
-          if(cellText === '') td.classList.add('text-muted');
+          if(cellText === '' || cellText === '【待定】') td.classList.add('text-muted');
+          if(cellText === '【待定】') td.style.color = '#dc3545'; // 待定顯示紅色
         }
         tr.appendChild(td);
       });
@@ -268,7 +264,6 @@
     });
     table.appendChild(tbody);
     
-    // 加上響應式容器，避免小螢幕破版
     let responsiveDiv = document.createElement('div');
     responsiveDiv.className = 'table-responsive';
     responsiveDiv.appendChild(table);
@@ -284,7 +279,7 @@
 
   async function loadPositions() {
     const tbody = document.getElementById('positionsTbody');
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">正在載入資料...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">正在載入資料...</td></tr>';
     
     try {
       const result = await callAPI('getPositions', {});
@@ -292,11 +287,11 @@
         renderPositions(result.data);
       } else {
         alert("載入失敗：" + result.message);
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">載入失敗，請重試</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">載入失敗，請重試</td></tr>';
       }
     } catch (error) {
       alert("網路錯誤或 API 異常！");
-      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">網路連線錯誤</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">網路連線錯誤</td></tr>';
     }
   }
 
@@ -305,10 +300,10 @@
     tbody.innerHTML = ''; 
     
     if (!data || data.length === 0) {
-      addPositionRow('主領', '');
+      addPositionRow('主領', '', '是');
     } else {
       data.forEach(item => {
-        addPositionRow(item.positionName, item.personnel);
+        addPositionRow(item.positionName, item.personnel, item.isRequired || '是');
       });
     }
 
@@ -326,20 +321,14 @@
     
     tr.innerHTML = `
       <td class="text-center align-middle drag-handle" style="cursor: grab; font-size: 1.2em; color: #888;" title="按住拖曳排序">☰</td>
+      <td><input type="text" class="form-control pos-name" value="${posName}" placeholder="例如：吉他"></td>
+      <td><input type="text" class="form-control pos-personnel" value="${personnel}" placeholder="例如：張三,李四"></td>
       <td>
-        <input type="text" class="form-control pos-name" value="${posName}" placeholder="例如：吉他">
+        <select class="form-select pos-required">
+          <option value="是" ${isRequired === "是" ? "selected" : ""}>必排</option>
+          <option value="否" ${isRequired === "否" ? "selected" : ""}>非必排</option>
+        </select>
       </td>
-      <td>
-        <input type="text" class="form-control pos-personnel" value="${personnel}" placeholder="例如：張三,李四">
-      </td>
-      <td>
-      <select class="form-select pos-required">
-        <option value="是" ${isRequired === "是" ? "selected" : ""}>是</option>
-        <option value="否" ${isRequired === "否" ? "selected" : ""}>否</option>
-      </select>
-    </td>
-    <td class="text-center"><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button></td>
-  `
       <td class="text-center align-middle">
         <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button>
       </td>
@@ -354,11 +343,13 @@
     rows.forEach(tr => {
       const nameInput = tr.querySelector('.pos-name');
       const personnelInput = tr.querySelector('.pos-personnel');
+      const reqInput = tr.querySelector('.pos-required');
       
       if (nameInput && nameInput.value.trim() !== '') {
         positionsData.push({
           positionName: nameInput.value.trim(),
-          personnel: personnelInput.value.trim()
+          personnel: personnelInput.value.trim(),
+          isRequired: reqInput ? reqInput.value : '是'
         });
       }
     });
@@ -475,6 +466,11 @@
 
     inputConditions.sort((a, b) => a.date.localeCompare(b.date));
 
+    // 建立主領輪替池
+    let leaderObj = currentPositions.find(p => p.positionName === '主領');
+    let leaderMasterList = leaderObj ? leaderObj.personnel.split(',').map(s => s.trim()).filter(s => s !== '') : [];
+    let leaderPool = []; 
+
     let consecutiveCount = {}; 
     currentPositions.forEach(p => { consecutiveCount[p.positionName] = {}; });
     
@@ -494,23 +490,42 @@
       currentPositions.forEach(posObj => {
         let posName = posObj.positionName;
         let candidates = posObj.personnel.split(',').map(s => s.trim()).filter(s => s !== '');
-
-        let validCandidates = candidates.filter(person => {
-          if (dayInfo.leaves.includes(person)) return false; 
-          if (assignedToday.includes(person)) return false;  
-          if (posName === '主領' && person === previousLeader) return false; 
-          if ((consecutiveCount[posName][person] || 0) >= 2) return false;   
-          return true; 
-        });
-
+        let isReq = posObj.isRequired || '是';
         let selectedPerson = "";
-        if (validCandidates.length > 0) {
-          let randomIndex = Math.floor(Math.random() * validCandidates.length);
-          selectedPerson = validCandidates[randomIndex];
+
+        if (posName === '主領') {
+          // --- 主領全員輪替邏輯 ---
+          if (leaderPool.length === 0) {
+            leaderPool = [...leaderMasterList]; // 池子空了就重新填滿
+          }
+          
+          let validLeaders = leaderPool.filter(p => !dayInfo.leaves.includes(p) && p !== previousLeader);
+          
+          if (validLeaders.length > 0) {
+            selectedPerson = validLeaders[Math.floor(Math.random() * validLeaders.length)];
+            leaderPool = leaderPool.filter(p => p !== selectedPerson); // 抽出後移出池子
+          }
+        } else {
+          // --- 一般位置邏輯 ---
+          let validCandidates = candidates.filter(person => {
+            if (dayInfo.leaves.includes(person)) return false; 
+            if (assignedToday.includes(person)) return false;  
+            if ((consecutiveCount[posName][person] || 0) >= 2) return false;   
+            return true; 
+          });
+
+          if (validCandidates.length > 0) {
+            selectedPerson = validCandidates[Math.floor(Math.random() * validCandidates.length)];
+          }
+        }
+
+        // 必排防呆
+        if (selectedPerson === "" && isReq === "是") {
+          selectedPerson = "【待定】"; 
         }
 
         dailyRecord[posName] = selectedPerson;
-        if (selectedPerson) assignedToday.push(selectedPerson);
+        if (selectedPerson && selectedPerson !== "【待定】") assignedToday.push(selectedPerson);
 
         candidates.forEach(person => {
           if (person === selectedPerson) {
@@ -667,7 +682,6 @@
       const result = await callAPI('saveSchedule', { scheduleData: finalData });
       if (result.status === 'success') {
         alert("🎉 排班表已成功儲存！");
-        // 儲存成功後自動切換至公佈欄查看最新結果
         switchTab('dashboard');
       } else {
         alert("儲存失敗：" + result.message);
@@ -680,16 +694,10 @@
   }
 
   // ==========================================
-  // 4. 牧師與題目與經文設定 (Sermon Tab) 相關邏輯
-  // ==========================================
-
-// ==========================================
   // 4. 牧師與題目與經文 (Sermon Tab) 邏輯
   // ==========================================
 
-  // 初始化並載入現有資料
   async function initSpreadsheet() {
-    // 1. 初始化試算表
     window.xs = x_spreadsheet('#x-spreadsheet-demo', {
       showToolbar: true,
       showGrid: true,
@@ -699,7 +707,6 @@
       }
     });
 
-    // 2. 嘗試從後端讀取現有資料
     try {
       const result = await callAPI('getSermonInfo', {});
       let rowsData = { 0: { cells: { 0: {text: '日期'}, 1: {text: '牧師'}, 2: {text: '題目'}, 3: {text: '經文'} } } };
@@ -723,7 +730,6 @@
     }
   }
 
-  // 儲存邏輯
   async function saveSermonData() {
     if (!window.xs) return;
     
@@ -732,7 +738,7 @@
     const headers = ['日期', '牧師', '題目', '經文'];
 
     Object.keys(data).forEach(rowIndex => {
-      if (rowIndex === '0' || rowIndex === 'len') return; // 跳過標題與屬性
+      if (rowIndex === '0' || rowIndex === 'len') return; 
       
       let rowObj = {};
       let hasData = false;
@@ -751,11 +757,12 @@
       const result = await callAPI('saveSermonInfo', { sermonData: finalSermonData });
       if (result.status === 'success') {
         alert("🎉 講員資訊儲存成功！");
-        loadDashboard(); // 順便更新公佈欄
+        loadDashboard(); 
       }
     } catch (e) {
       alert("儲存失敗，請檢查網路。");
     }
-  }</script>
+  }
+</script>
 </body>
 </html>
