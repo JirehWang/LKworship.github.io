@@ -454,7 +454,7 @@
     btn.disabled = false; btn.innerText = "讀取資料 📥";
   }
 
-  // --- HTML 預覽表格與下拉選單渲染 ---
+// --- HTML 預覽表格與下拉選單渲染 (加入同日重複防呆警告) ---
   function renderPreviewTable(data) {
     const container = document.getElementById('previewContainer');
     const thead = document.getElementById('previewThead');
@@ -518,9 +518,47 @@
             select.appendChild(opt);
           });
 
+          // 紀錄「改變前」的值，如果使用者取消警告，可以退回原本的值
+          let previousValue = row[h] || (isReq === '是' ? '【待定】' : '');
+
           select.onchange = function() {
-            generatedScheduleData[rowIndex][h] = this.value;
-            if (this.value === '【待定】') this.classList.add('select-danger');
+            let newValue = this.value;
+
+            // 🌟 核心防呆邏輯：檢查同一天是否有重複的人
+            if (newValue !== '' && newValue !== '【待定】') {
+              let duplicateRoles = [];
+              let dayData = generatedScheduleData[rowIndex];
+              
+              // 掃描這一天所有的位置，看看這個人是不是已經在其他位置了
+              currentPositions.forEach(pos => {
+                let checkPosName = pos.positionName;
+                // 排除自己目前正在改的這個位置
+                if (checkPosName !== h && dayData[checkPosName] === newValue) {
+                  duplicateRoles.push(checkPosName);
+                }
+              });
+
+              // 如果發現他已經在其他位置，跳出警告確認視窗
+              if (duplicateRoles.length > 0) {
+                let confirmMsg = `⚠️ 警告：\n[${newValue}] 在這一天已經被安排了【${duplicateRoles.join('、')}】。\n\n確定要讓他同時擔任【${h}】嗎？`;
+                
+                if (!confirm(confirmMsg)) {
+                  // 使用者按了「取消」：退回原本的選項
+                  this.value = previousValue;
+                  // 恢復顏色設定
+                  if (previousValue === '【待定】') this.classList.add('select-danger');
+                  else this.classList.remove('select-danger');
+                  return; // 終止後續的儲存動作
+                }
+              }
+            }
+
+            // 若無重複，或使用者堅持要排，則更新資料
+            generatedScheduleData[rowIndex][h] = newValue;
+            previousValue = newValue; // 將當前的值設為下一次的「改變前的值」
+            
+            // 處理紅色待定樣式
+            if (newValue === '【待定】') this.classList.add('select-danger');
             else this.classList.remove('select-danger');
           };
           td.appendChild(select);
@@ -534,7 +572,7 @@
     container.style.display = 'block';
     saveBtn.style.display = 'inline-block';
   }
-
+  
   async function saveGeneratedSchedule() {
     if (generatedScheduleData.length === 0) return;
     const btn = document.getElementById('saveScheduleBtn');
