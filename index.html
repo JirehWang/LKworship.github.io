@@ -653,45 +653,64 @@
   }
 
   // 🌟 神奇的 Excel 貼上解析器
+// 🌟 神奇的 Excel 貼上解析器 (具備自動覆蓋重複日期功能)
   function handleSermonPaste(e) {
-    e.preventDefault(); // 阻止文字出現在 textarea 裡，保持畫面乾淨
+    e.preventDefault(); 
     
-    // 取得剪貼簿裡的文字
     let pasteData = (e.clipboardData || window.clipboardData).getData('text');
     if (!pasteData) return;
 
-    // 用換行符號切出每一列
     let rows = pasteData.split(/\r?\n/);
-    let addedCount = 0;
+    let updatedCount = 0;
+    let newCount = 0;
 
     rows.forEach(rowStr => {
       if (rowStr.trim() === '') return;
-      // Excel 複製出來的欄位會用 Tab (\t) 隔開
       let cols = rowStr.split('\t');
       
-      // 智慧防呆：如果使用者不小心把標題也複製進來了，自動略過那一列
+      // 跳過標題列
       if (cols[0] && cols[0].includes('日期')) return;
 
-      let date = cols[0] ? cols[0].trim() : '';
+      let date = cols[0] ? cols[0].trim().replace(/\//g, '-') : '';
       let pastor = cols[1] ? cols[1].trim() : '';
       let title = cols[2] ? cols[2].trim() : '';
       let scripture = cols[3] ? cols[3].trim() : '';
 
-      // 將 YYYY/MM/DD 自動轉成 HTML 認得的 YYYY-MM-DD
-      date = date.replace(/\//g, '-');
+      if (!date) return;
 
-      if (date || pastor || title || scripture) {
+      // --- 核心邏輯：檢查畫面上是否已有該日期 ---
+      const existingRows = document.querySelectorAll('#sermonTbody tr');
+      let foundExisting = false;
+
+      for (let tr of existingRows) {
+        let dateInput = tr.querySelector('.sermon-date');
+        if (dateInput && dateInput.value === date) {
+          // 找到了！直接覆蓋這一行的內容
+          tr.querySelector('.sermon-pastor').value = pastor;
+          tr.querySelector('.sermon-title').value = title;
+          tr.querySelector('.sermon-scripture').value = scripture;
+          
+          // 加上一個短暫的黃色閃爍動畫，提示使用者這一行被更新了
+          tr.style.backgroundColor = '#fff3cd';
+          setTimeout(() => { tr.style.backgroundColor = ''; }, 1000);
+          
+          foundExisting = true;
+          updatedCount++;
+          break;
+        }
+      }
+
+      // 如果畫面上沒找到該日期，才新增一列
+      if (!foundExisting) {
         addSermonRow(date, pastor, title, scripture);
-        addedCount++;
+        newCount++;
       }
     });
-    
-    if(addedCount > 0) {
-      // 貼上後把畫面捲動到最下面，方便查看
-      document.getElementById('sermonTbody').lastElementChild.scrollIntoView({ behavior: 'smooth' });
-    }
-  }
 
+    // 提示使用者處理結果
+    console.log(`貼上完成：更新 ${updatedCount} 筆，新增 ${newCount} 筆。`);
+  }
+  
   // 儲存資料回 Google Sheets
   async function saveSermonData() {
     const rows = document.querySelectorAll('#sermonTbody tr');
