@@ -16,7 +16,7 @@
     #dashboardTable table th, #dashboardTable table td { text-align: center; vertical-align: middle; white-space: nowrap; }
     .warning-row { background-color: #fff3cd !important; border-left: 5px solid #ffc107; }
     
-    /* 預覽表格優化樣式 */
+    /* 預覽表格優化樣式 (取代原本的 x-spreadsheet) */
     .preview-table-container { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #dee2e6; }
     .preview-table th { background-color: #212529; color: white; text-align: center; font-weight: 500; padding: 12px; }
     .preview-table td { vertical-align: middle; text-align: center; padding: 8px 12px; }
@@ -387,7 +387,7 @@
     if (result.status === 'success') {
       if (result.data.length === 0) alert("區間內無排班資料。");
       else {
-        generatedScheduleData = result.data; // 綁定到全域變數，供存檔使用
+        generatedScheduleData = result.data; 
         renderPreviewTable(generatedScheduleData);
         alert(`✅ 讀取了 ${result.data.length} 天的排班資料！`);
       }
@@ -406,7 +406,7 @@
 
     thead.innerHTML = ''; tbody.innerHTML = '';
 
-    // 產生表頭
+    // 產生表頭：日期、聚會類別，後面接所有的位置名稱
     let headers = ['日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
     let trHead = document.createElement('tr');
     headers.forEach(h => {
@@ -424,19 +424,20 @@
         let td = document.createElement('td');
         
         if (h === '日期') {
+          // 日期唯讀顯示
           td.innerHTML = `<span class="badge bg-secondary fs-6 shadow-sm">${row[h]}</span>`;
         } 
         else if (h === '聚會類別') {
-          // 聚會類別使用文字輸入框
+          // 聚會類別使用手動輸入框
           let input = document.createElement('input');
           input.type = 'text';
-          input.className = 'form-control form-control-sm text-center border-0 bg-light';
+          input.className = 'form-control form-control-sm text-center border-1 border-secondary border-opacity-25';
           input.value = row[h] || '';
           input.onchange = (e) => { generatedScheduleData[rowIndex][h] = e.target.value.trim(); };
           td.appendChild(input);
         } 
         else {
-          // 動態產生位置的下拉選單
+          // 各個位置使用下拉選單
           let posDef = currentPositions.find(p => p.positionName === h);
           let candidates = posDef ? posDef.personnel.split(',').map(s=>s.trim()).filter(s=>s) : [];
           let isReq = posDef ? (posDef.isRequired || '是') : '是';
@@ -444,16 +445,14 @@
           let select = document.createElement('select');
           select.className = 'form-select form-select-sm text-center';
           
-          // 如果是待定，套用紅色警告樣式
           if(row[h] === '【待定】') select.classList.add('select-danger');
 
-          // 加入預設選項 (待定 或 空白)
           let optDefault = document.createElement('option');
           optDefault.value = (isReq === '是') ? '【待定】' : '';
           optDefault.text = (isReq === '是') ? '【待定】' : '無';
           select.appendChild(optDefault);
 
-          // 加入候選人員名單
+          // 專屬該位置的人員名單
           candidates.forEach(c => {
             let opt = document.createElement('option');
             opt.value = c; opt.text = c;
@@ -461,14 +460,10 @@
             select.appendChild(opt);
           });
 
-          // 當下拉選單改變時，同步更新背後的資料陣列，並切換顏色
           select.onchange = function() {
             generatedScheduleData[rowIndex][h] = this.value;
-            if (this.value === '【待定】') {
-              this.classList.add('select-danger');
-            } else {
-              this.classList.remove('select-danger');
-            }
+            if (this.value === '【待定】') this.classList.add('select-danger');
+            else this.classList.remove('select-danger');
           };
           td.appendChild(select);
         }
@@ -482,7 +477,6 @@
     saveBtn.style.display = 'inline-block';
   }
 
-  // 因為 generatedScheduleData 會被下拉選單自動更新，存檔邏輯變得非常簡潔！
   async function saveGeneratedSchedule() {
     if (generatedScheduleData.length === 0) return;
     const btn = document.getElementById('saveScheduleBtn');
@@ -492,7 +486,7 @@
       const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
       if (result.status === 'success') {
         alert("🎉 排班表已成功儲存！");
-        switchTab('dashboard'); // 自動跳轉公佈欄
+        switchTab('dashboard'); 
       } else alert("儲存失敗：" + result.message);
     } catch (error) {
       alert("網路連線錯誤！");
