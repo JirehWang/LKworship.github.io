@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>敬拜團服事公佈欄</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #f8f9fa; font-family: "Microsoft JhengHei", sans-serif; padding: 15px; }
+    .main-card { background-color: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 1400px; margin: auto; }
+    
+    /* 捲動容器與凍結窗格 */
+    .scroll-container { background: white; border-radius: 8px; overflow-x: auto; border: 1px solid #dee2e6; position: relative; }
+    .bulletin-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; }
+    .bulletin-table th { background-color: #2c3e50; color: white; text-align: center; padding: 15px 10px; white-space: nowrap; position: sticky; top: 0; z-index: 10; }
+    .bulletin-table td { 
+      vertical-align: middle; text-align: center; padding: 12px 10px; border-bottom: 1px solid #eee;
+      /* 🌟 核心需求：文字折行 (約10個中文字) */
+      max-width: 180px; white-space: normal !important; word-break: break-all; line-height: 1.5; font-size: 1rem;
+    }
+
+    /* 凍結日期與類別 */
+    .bulletin-table th:nth-child(1), .bulletin-table td:nth-child(1) { position: sticky; left: 0; width: 110px; z-index: 5; background-color: #fff; }
+    .bulletin-table th:nth-child(2), .bulletin-table td:nth-child(2) { position: sticky; left: 110px; width: 100px; z-index: 5; background-color: #fff; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
+    .bulletin-table thead th:nth-child(1), .bulletin-table thead th:nth-child(2) { z-index: 15; background-color: #2c3e50; }
+
+    .warning-row { background-color: #fff9db !important; }
+    .warning-label { color: #d97706; font-size: 0.8em; font-weight: bold; display: block; }
+    .quarter-box { background: #e9ecef; padding: 12px; border-radius: 8px; margin-bottom: 15px; }
+  </style>
+</head>
+<body>
+
+<div class="text-center mb-4">
+  <h2 class="fw-bold">⛪ 敬拜團服事公佈欄</h2>
+</div>
+
+<div class="main-card">
+  <div class="quarter-box d-flex justify-content-between align-items-center">
+    <h5 class="mb-0 fw-bold">查詢季度</h5>
+    <select id="quarterSelect" class="form-select w-auto fw-bold" onchange="loadDashboard()">
+      <option value="2026-Q1" selected>2026-Q1</option>
+      <option value="2026-Q2">2026-Q2</option>
+      <option value="2026-Q3">2026-Q3</option>
+      <option value="2026-Q4">2026-Q4</option>
+    </select>
+  </div>
+
+  <div class="scroll-container" id="tableWrapper">
+    <div class="text-center p-5 text-muted" id="loadingMsg">
+      <div class="spinner-border text-primary mb-2"></div>
+      <div>正在同步最新資料...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 🌟 重要：請將此處換成您 GAS 部署後的正式網址
+  const API_URL = 'https://script.google.com/macros/s/您的API編號/exec';
+
+  async function loadDashboard() {
+    const wrapper = document.getElementById('tableWrapper');
+    const [year, quarter] = document.getElementById('quarterSelect').value.split('-');
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getSchedule', year: year, quarter: quarter })
+      });
+      const result = await response.json();
+      if (result.status === 'success') renderTable(result.data);
+    } catch (e) {
+      wrapper.innerHTML = '<div class="alert alert-danger m-3">載入失敗，請檢查網路連線。</div>';
+    }
+  }
+
+  function renderTable(data) {
+    const wrapper = document.getElementById('tableWrapper');
+    if (!data || data.length === 0) {
+      wrapper.innerHTML = '<div class="text-center p-5">本季度暫無資料。</div>';
+      return;
+    }
+
+    const fixedHeaders = ['日期', '聚會類別', '牧師', '題目', '經文'];
+    const allKeys = Object.keys(data[0]);
+    const dynamicHeaders = allKeys.filter(k => !fixedHeaders.includes(k) && !['hasWarning','warningMessage','年度','季度'].includes(k));
+    const finalHeaders = [...fixedHeaders, ...dynamicHeaders];
+
+    let html = `<table class="bulletin-table"><thead><tr>`;
+    finalHeaders.forEach(h => html += `<th>${h}</th>`);
+    html += `</tr></thead><tbody>`;
+
+    data.forEach(row => {
+      html += `<tr class="${row.hasWarning ? 'warning-row' : ''}">`;
+      finalHeaders.forEach(h => {
+        let val = row[h] || '';
+        if (h === '日期') {
+          html += `<td><strong>${val}</strong>${row.hasWarning ? `<span class="warning-label">⚠️ ${row.warningMessage}</span>` : ''}</td>`;
+        } else {
+          let style = (val === '【待定】') ? 'text-danger fw-bold' : '';
+          html += `<td class="${style}">${val || '-'}</td>`;
+        }
+      });
+      html += `</tr>`;
+    });
+    html += `</tbody></table>`;
+    wrapper.innerHTML = html;
+  }
+
+  window.onload = loadDashboard;
+</script>
+</body>
+</html>
