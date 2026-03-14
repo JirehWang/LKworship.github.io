@@ -178,12 +178,35 @@
     </div>
   </div>
 
-  <div id="sermon" class="tab-content">
+<div id="sermon" class="tab-content">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h4>牧師與題目與經文設定</h4>
-      <button class="btn btn-success" onclick="saveSermonData()">儲存至資料庫</button>
+      <h4>📖 牧師、題目與經文登錄</h4>
+      <button class="btn btn-success fw-bold px-4" onclick="saveSermonData()">儲存至資料庫</button>
     </div>
-    <div id="x-spreadsheet-demo"></div>
+
+    <div class="alert alert-info shadow-sm border-0">
+      💡 <strong>快速匯入秘訣：</strong>請在 Excel 複製 <strong>[日期, 牧師, 題目, 經文]</strong> 這四個欄位，點擊下方輸入框並按下 <code>Ctrl + V</code> 貼上，系統會自動為您轉換成表格！
+    </div>
+
+    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light" rows="2" 
+      placeholder="📋 點擊這裡，然後貼上 Excel 資料..." onpaste="handleSermonPaste(event)"></textarea>
+
+    <div class="table-responsive preview-table-container">
+      <table class="table table-hover mb-0 preview-table">
+        <thead class="table-dark">
+          <tr>
+            <th style="width: 15%">日期</th>
+            <th style="width: 15%">牧師</th>
+            <th style="width: 35%">題目</th>
+            <th style="width: 30%">經文</th>
+            <th style="width: 5%">操作</th>
+          </tr>
+        </thead>
+        <tbody id="sermonTbody">
+          </tbody>
+      </table>
+    </div>
+    <button class="btn btn-outline-secondary w-100 fw-bold mt-2" onclick="addSermonRow('', '', '', '')">+ 手動新增一列</button>
   </div>
 </div>
 
