@@ -6,6 +6,9 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+
   <style>
     body { background-color: #f4f7f6; font-family: "Microsoft JhengHei", sans-serif; }
     .container { background-color: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-top: 2rem; margin-bottom: 3rem; }
@@ -46,57 +49,28 @@
       text-align: center; 
       padding: 12px 10px; 
       border-bottom: 1px solid #eee;
-      /* 🌟 核心需求：文字折行限制 (約10個中文字) */
       max-width: 180px; 
       white-space: normal !important; 
       word-break: break-all;
       line-height: 1.5;
     }
 
-    /* --- 凍結第一欄：日期 --- */
-    .modern-table th:nth-child(1), 
-    .modern-table td:nth-child(1) {
-      position: sticky;
-      left: 0;
-      width: 110px;
-      min-width: 110px;
-      max-width: 110px;
-      z-index: 5;
-      background-color: #fff;
-    }
-
-    /* --- 凍結第二欄：聚會類別 --- */
-    .modern-table th:nth-child(2), 
-    .modern-table td:nth-child(2) {
-      position: sticky;
-      left: 110px; /* 剛好接在第一欄的寬度後面 */
-      width: 100px;
-      min-width: 100px;
-      max-width: 100px;
-      z-index: 5;
-      background-color: #fff;
-      box-shadow: 3px 0 5px -2px rgba(0,0,0,0.1); /* 右側陰影 */
-    }
-
-    /* 確保深色表頭在凍結區也是深色 */
-    .modern-table thead th:nth-child(1), 
-    .modern-table thead th:nth-child(2) {
-      z-index: 15;
-      background-color: #343a40;
-    }
-
-    /* 滑鼠移過整列變色 */
+    .modern-table th:nth-child(1), .modern-table td:nth-child(1) { position: sticky; left: 0; width: 110px; min-width: 110px; max-width: 110px; z-index: 5; background-color: #fff; }
+    .modern-table th:nth-child(2), .modern-table td:nth-child(2) { position: sticky; left: 110px; width: 100px; min-width: 100px; max-width: 100px; z-index: 5; background-color: #fff; box-shadow: 3px 0 5px -2px rgba(0,0,0,0.1); }
+    .modern-table thead th:nth-child(1), .modern-table thead th:nth-child(2) { z-index: 15; background-color: #343a40; }
     .modern-table tbody tr:hover td { background-color: #f8f9fa; }
 
     .warning-row { background-color: #fff8e1 !important; }
     .warning-text { color: #f57c00; font-size: 0.85em; font-weight: bold; margin-top: 4px; display: block; }
     
-    /* 下拉選單與輸入框樣式 */
-    .modern-table .form-select, .modern-table input[type="text"] { 
-      border: 1px solid #ced4da; transition: all 0.2s; min-width: 110px; text-align: center;
-    }
+    .modern-table .form-select, .modern-table input[type="text"] { border: 1px solid #ced4da; transition: all 0.2s; min-width: 110px; text-align: center; }
     .modern-table .form-select:hover { border-color: #0d6efd; }
     .select-danger { background-color: #ffebee !important; color: #c62828 !important; font-weight: bold; border-color: #ef5350 !important; }
+
+    /* 🌟 新增：多選下拉選單 (Choices.js) 自訂樣式 */
+    .choices { margin-bottom: 0 !important; }
+    .choices__inner { min-height: 35px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ced4da; background-color: #fff; }
+    .choices__list--multiple .choices__item { background-color: #0d6efd; border: 1px solid #0a58ca; border-radius: 4px; margin-right: 5px; }
   </style>
 </head>
 <body>
@@ -130,7 +104,6 @@
     <div class="alert alert-light border border-warning border-opacity-50">
       💡 若出現 <span class="badge bg-warning text-dark">⚠️ 警告</span> 標記，代表該日排班有違規情況（如連任或同一天重複排班）。
     </div>
-    
     <div class="table-scroll-container" id="dashboardContainer">
       <div class="text-center text-muted p-5">請選擇季度以載入資料...</div>
     </div> 
@@ -166,7 +139,7 @@
           <input type="text" id="multiDatePicker" class="form-control mb-2 bg-white" placeholder="點此打開日曆多選...">
           <button class="btn btn-sm btn-primary w-100 fw-bold" onclick="addSelectedDates()">確認新增日期</button>
           
-          <div id="dateSettingsContainer" class="mt-3" style="max-height: 250px; overflow-y: auto;"></div>
+          <div id="dateSettingsContainer" class="mt-3" style="max-height: 350px; overflow-y: auto;"></div>
           <button class="btn btn-danger w-100 mt-3 fw-bold" onclick="generateSchedule()">產生排班預覽 🚀</button>
         </div>
         
@@ -259,7 +232,7 @@
   }
 
   // ==========================================
-  // 1. 公佈欄邏輯 (完美排序與折行版)
+  // 1. 公佈欄邏輯
   // ==========================================
   async function loadDashboard() {
     const container = document.getElementById('dashboardContainer');
@@ -286,10 +259,8 @@
       return;
     }
 
-    // 🌟 定義欄位強制順序
     const fixedHeaders = ['日期', '聚會類別', '牧師', '題目', '經文'];
     const allKeys = Object.keys(data[0]);
-    // 過濾掉系統保留字元與已固定的標題，剩下的就是服事位置
     const dynamicHeaders = allKeys.filter(k => !fixedHeaders.includes(k) && !['hasWarning', 'warningMessage', '年度', '季度'].includes(k));
     const finalHeaders = [...fixedHeaders, ...dynamicHeaders];
 
@@ -310,7 +281,6 @@
           }
           html += `</td>`;
         } else {
-          // 若為待定，字體標紅
           let extraClass = (val === '【待定】') ? 'text-danger fw-bold' : '';
           let displayVal = (val === '') ? '<span class="text-black-50">-</span>' : val;
           html += `<td class="${extraClass}">${displayVal}</td>`;
@@ -376,34 +346,67 @@
   }
 
   // ==========================================
-  // 3. 服事安排 (自動排班引擎 + 預覽渲染)
+  // 3. 服事安排 (全新多選請假功能)
   // ==========================================
   let currentPositions = []; 
   let generatedScheduleData = []; 
   let fpInstance = null; 
+  let uniquePersonnel = []; // 🌟 用來儲存去重複後的所有人員名單
 
   async function initScheduleTab() {
     if (!fpInstance) fpInstance = flatpickr("#multiDatePicker", { mode: "multiple", dateFormat: "Y-m-d", locale: "zh" });
     const result = await callAPI('getPositions', {});
-    if (result.status === 'success') currentPositions = result.data;
+    if (result.status === 'success') {
+      currentPositions = result.data;
+      
+      // 🌟 自動讀取並過濾重複的人員名單
+      let nameSet = new Set();
+      currentPositions.forEach(pos => {
+        if (pos.personnel) {
+          pos.personnel.split(',').forEach(name => {
+            let cleanName = name.trim();
+            if (cleanName !== '') nameSet.add(cleanName);
+          });
+        }
+      });
+      uniquePersonnel = Array.from(nameSet).sort();
+    }
   }
 
   function addSelectedDates() {
     if (!fpInstance || fpInstance.selectedDates.length === 0) { alert("請先點選日期"); return; }
     const selectedDates = fpInstance.selectedDates.sort((a, b) => a - b);
+    
+    // 🌟 預先生成下拉選單的 Option HTML
+    let optionsHtml = uniquePersonnel.map(name => `<option value="${name}">${name}</option>`).join('');
+
     selectedDates.forEach(dateObj => {
       const dateString = flatpickr.formatDate(dateObj, "Y-m-d");
       const div = document.createElement('div');
       div.className = 'card mb-2 p-2 border-primary border-opacity-25 shadow-sm';
+      
+      // 🌟 將原本的 input 替換成 select multiple
       div.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="d-flex justify-content-between align-items-center mb-2">
           <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateString}" required>
           <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold text-center" value="主日" placeholder="聚會類別">
           <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.card').remove()">x</button>
         </div>
-        <input type="text" class="form-control form-control-sm s-leave text-center" placeholder="請假人員 (用逗號隔開)">
+        <select class="form-select s-leave" multiple>
+          ${optionsHtml}
+        </select>
       `;
       document.getElementById('dateSettingsContainer').appendChild(div);
+
+      // 🌟 套用 Choices.js 讓它變成精美的標籤多選工具
+      const selectElement = div.querySelector('.s-leave');
+      new Choices(selectElement, {
+        removeItemButton: true,
+        searchPlaceholderValue: '搜尋人員...',
+        placeholderValue: '🔍 點選請假人員',
+        noResultsText: '找不到此人',
+        itemSelectText: '' 
+      });
     });
     fpInstance.clear();
   }
@@ -414,14 +417,20 @@
 
   function generateSchedule() {
     if (currentPositions.length === 0) { alert("請先至設定頁建立位置資料！"); return; }
-    const rows = document.querySelectorAll('.schedule-date-row, #dateSettingsContainer .card');
+    const rows = document.querySelectorAll('#dateSettingsContainer .card');
     let inputConditions = [];
+    
     rows.forEach(row => {
       const dateVal = row.querySelector('.s-date').value;
       if (dateVal) {
+        // 🌟 取得下拉選單中所有被「選取」的人員 (陣列格式)
+        const leaveSelect = row.querySelector('.s-leave');
+        const selectedLeaves = Array.from(leaveSelect.selectedOptions).map(opt => opt.value);
+
         inputConditions.push({
-          date: dateVal, type: row.querySelector('.s-type').value.trim(),
-          leaves: row.querySelector('.s-leave').value.split(',').map(s=>s.trim()).filter(s=>s) 
+          date: dateVal, 
+          type: row.querySelector('.s-type').value.trim(),
+          leaves: selectedLeaves
         });
       }
     });
@@ -429,7 +438,6 @@
     if (inputConditions.length === 0) { alert("請設定至少一天日期！"); return; }
     inputConditions.sort((a, b) => a.date.localeCompare(b.date));
 
-    // 演算法變數初始化
     let leaderObj = currentPositions.find(p => p.positionName === '主領');
     let leaderMasterList = leaderObj ? leaderObj.personnel.split(',').map(s=>s.trim()).filter(s=>s) : [];
     let leaderPool = []; 
@@ -498,7 +506,7 @@
     btn.disabled = false; btn.innerText = "讀取資料 📥";
   }
 
-  // --- HTML 預覽表格與下拉選單渲染 (同日重複防呆) ---
+  // --- HTML 預覽表格與下拉選單渲染 ---
   function renderPreviewTable(data) {
     const container = document.getElementById('previewContainer');
     const thead = document.getElementById('previewThead');
@@ -613,9 +621,8 @@
   }
 
   // ==========================================
-  // 4. 牧師設定邏輯 (Excel 貼上 + 自動覆蓋版)
+  // 4. 牧師設定邏輯
   // ==========================================
-  
   async function loadSermonData() {
     const tbody = document.getElementById('sermonTbody');
     tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted p-4"><div class="spinner-border text-primary"></div></td></tr>';
@@ -686,7 +693,6 @@
       if (!foundExisting) addSermonRow(date, pastor, title, scripture);
     });
     
-    // 清空貼上區，保持乾淨
     e.target.value = '';
     document.getElementById('sermonTbody').lastElementChild.scrollIntoView({ behavior: 'smooth' });
   }
