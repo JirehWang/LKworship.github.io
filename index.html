@@ -8,25 +8,33 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   
   <style>
+    body { background-color: #f8f9fa; }
     .tab-content { display: none; padding-top: 20px; }
     .tab-content.active { display: block; }
-    #schedule-spreadsheet { width: 100%; overflow: hidden; } 
-    /* 讓公佈欄表格的文字置中且垂直對齊 */
+    
+    /* 公佈欄樣式 */
     #dashboardTable table th, #dashboardTable table td { text-align: center; vertical-align: middle; white-space: nowrap; }
-    /* 警告行的特殊高亮 */
     .warning-row { background-color: #fff3cd !important; border-left: 5px solid #ffc107; }
+    
+    /* 預覽表格優化樣式 */
+    .preview-table-container { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #dee2e6; }
+    .preview-table th { background-color: #212529; color: white; text-align: center; font-weight: 500; padding: 12px; }
+    .preview-table td { vertical-align: middle; text-align: center; padding: 8px 12px; }
+    .preview-table .form-select { border: 1px solid #ced4da; transition: all 0.2s; cursor: pointer; }
+    .preview-table .form-select:hover { border-color: #0d6efd; }
+    .select-danger { background-color: #ffe6e6 !important; border-color: #dc3545 !important; color: #dc3545 !important; font-weight: bold; }
   </style>
 </head>
 <body>
 
-<div class="container mt-4 mb-5">
-  <h2 class="mb-4">敬拜團服事排班系統 <span class="badge bg-dark fs-6">v2.0</span></h2>
+<div class="container mt-4 mb-5 bg-white p-4 rounded-4 shadow-sm">
+  <h2 class="mb-4">敬拜團服事排班系統 <span class="badge bg-primary fs-6">Pro</span></h2>
   
   <ul class="nav nav-tabs" id="myTab">
-    <li class="nav-item"><a class="nav-link active" href="#" onclick="switchTab('dashboard')">公佈欄</a></li>
-    <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('settings')">位置設定與人員</a></li>
-    <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('schedule')">服事安排</a></li>
-    <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('sermon')">牧師與題目與經文設定</a></li>
+    <li class="nav-item"><a class="nav-link active fw-bold" href="#" onclick="switchTab('dashboard')">公佈欄</a></li>
+    <li class="nav-item"><a class="nav-link fw-bold" href="#" onclick="switchTab('settings')">位置設定與人員</a></li>
+    <li class="nav-item"><a class="nav-link fw-bold" href="#" onclick="switchTab('schedule')">服事安排</a></li>
+    <li class="nav-item"><a class="nav-link fw-bold" href="#" onclick="switchTab('sermon')">牧師與題目設定</a></li>
   </ul>
 
   <div id="dashboard" class="tab-content active">
@@ -42,11 +50,9 @@
         </select>
       </div>
     </div>
-    
     <div class="alert alert-light border">
-      💡 系統會自動抓取已發布的班表。若出現 <span class="badge bg-warning text-dark">⚠️ 警告</span> 標記，代表排班有違規情況（如連續服事或同一天重複排班），請至「服事安排」進行修正。
+      💡 系統會自動抓取已發布的班表。若出現 <span class="badge bg-warning text-dark">⚠️ 警告</span> 標記，代表排班有違規情況。
     </div>
-    
     <div id="dashboardTable">
       <div class="text-center text-muted my-5">請選擇季度以載入資料...</div>
     </div> 
@@ -57,12 +63,6 @@
       <h4>位置設定與人員</h4>
       <button class="btn btn-primary" onclick="savePositionsToServer()">儲存設定</button>
     </div>
-    
-    <div class="alert alert-info">
-      💡 提示：請在下方設定各服事位置，對應的人員名單請以<strong>半形逗號 <code>,</code></strong> 分隔 (例如：王小明,李大華)。<br>
-      🔄 <strong>按住最左側的「☰」即可拖曳調整位置順序。</strong>
-    </div>
-
     <table class="table table-bordered table-hover">
       <thead class="table-light">
         <tr>
@@ -73,66 +73,48 @@
           <th style="width: 10%; text-align: center;">操作</th>
         </tr>
       </thead>
-      <tbody id="positionsTbody">
-        </tbody>
+      <tbody id="positionsTbody"></tbody>
     </table>
-    
-    <button class="btn btn-outline-secondary w-100" onclick="addPositionRow('', '')">
-      + 新增一個位置
-    </button>
+    <button class="btn btn-outline-secondary w-100" onclick="addPositionRow('', '')">+ 新增一個位置</button>
   </div>
 
   <div id="schedule" class="tab-content">
     <div class="row">
-      <div class="col-md-4 border-end">
-        
-        <h5 class="mb-3">1. 產生全新排班</h5>
-        
+      <div class="col-md-3 border-end">
+        <h5 class="mb-3 text-primary">1. 產生全新排班</h5>
         <div class="mb-3 p-2 bg-light border rounded">
-          <label class="form-label fw-bold text-primary">挑選排班日期：</label>
-          <div class="input-group">
-            <input type="text" id="multiDatePicker" class="form-control bg-white" placeholder="點此打開日曆多選...">
-            <button class="btn btn-primary" onclick="addSelectedDates()">確認新增</button>
-          </div>
-          <small class="text-muted mt-1 d-block">提示：可在日曆上點擊多個日期。</small>
+          <label class="form-label fw-bold">挑選排班日期：</label>
+          <input type="text" id="multiDatePicker" class="form-control mb-2 bg-white" placeholder="點此打開日曆多選...">
+          <button class="btn btn-primary w-100" onclick="addSelectedDates()">確認新增日期</button>
         </div>
-
-        <div class="alert alert-secondary" style="font-size: 0.9em;">
-          下方為已建立的日期。聚會預設為「主日」，可手動修改。若有人請假請填寫姓名。
-        </div>
-        
-        <div id="dateSettingsContainer">
-          </div>
-        
-        <button class="btn btn-primary w-100 mt-2 mb-4" onclick="generateSchedule()">產生排班預覽 🚀</button>
-
+        <div id="dateSettingsContainer" style="max-height: 400px; overflow-y: auto;"></div>
+        <button class="btn btn-primary w-100 mt-2 mb-4 fw-bold" onclick="generateSchedule()">產生排班預覽 🚀</button>
         <hr>
-
-        <h5 class="mb-3 text-success">2. 讀取並修改現有排班</h5>
+        <h5 class="mb-3 text-success">2. 讀取現有排班</h5>
         <div class="p-2 border border-success border-opacity-50 rounded bg-success bg-opacity-10">
-          <label class="form-label fw-bold text-success">選擇讀取區間：</label>
-          <div class="d-flex mb-2">
-            <input type="date" id="editStartDate" class="form-control form-control-sm me-1" title="開始日期">
-            <span class="align-self-center mx-1">至</span>
-            <input type="date" id="editEndDate" class="form-control form-control-sm ms-1" title="結束日期">
-          </div>
-          <button class="btn btn-success w-100" onclick="loadExistingSchedule()">讀取資料 📥</button>
+          <input type="date" id="editStartDate" class="form-control form-control-sm mb-1">
+          <input type="date" id="editEndDate" class="form-control form-control-sm mb-2">
+          <button class="btn btn-success w-100 fw-bold" onclick="loadExistingSchedule()">讀取資料 📥</button>
         </div>
-
       </div>
 
-      <div class="col-md-8">
+      <div class="col-md-9">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="mb-0">排班預覽 (可如 Excel 般編輯)</h5>
-          <button class="btn btn-success" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存至資料庫</button>
+          <h5 class="mb-0 text-primary">排班預覽 (可直接點擊下拉選單修改)</h5>
+          <button class="btn btn-success fw-bold px-4" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存至資料庫</button>
         </div>
         
-        <div class="table-responsive">
-          <div id="schedule-spreadsheet" style="display: none;"></div>
-          
-          <div id="previewPlaceholder" class="text-center text-muted mt-5">
-            請先在左側設定日期，並點擊「產生排班」或「讀取資料」
+        <div class="preview-table-container" id="previewContainer" style="display: none;">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0 preview-table" id="previewTable">
+              <thead id="previewThead"></thead>
+              <tbody id="previewTbody"></tbody>
+            </table>
           </div>
+        </div>
+        
+        <div id="previewPlaceholder" class="text-center text-muted mt-5 p-5 bg-light rounded border">
+          <h5 class="text-secondary">請先在左側點擊「產生排班預覽」或「讀取資料」</h5>
         </div>
       </div>
     </div>
@@ -152,67 +134,49 @@
 <script src="https://npmcdn.com/flatpickr/dist/l10n/zh.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script> 
 <script>
-  // 您的 GAS Web App URL
   const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
   function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
-    
     document.querySelector(`a[onclick="switchTab('${tabId}')"]`).classList.add('active');
     
-    // 初始化或載入資料
     if(tabId === 'dashboard') loadDashboard();
     if(tabId === 'settings') loadPositions();
     if(tabId === 'schedule') initScheduleTab();
     if(tabId === 'sermon' && !window.xs) initSpreadsheet();
   }
 
-  // 網頁載入完成後，預設載入公佈欄資料
-  window.onload = () => {
-    loadDashboard();
-  };
+  window.onload = () => loadDashboard();
 
   async function callAPI(action, payload) {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: action, ...payload })
-    });
+    const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: action, ...payload }) });
     return await response.json();
   }
 
   // ==========================================
-  // 1. 公佈欄 (Dashboard) 渲染邏輯
+  // 1. 公佈欄邏輯
   // ==========================================
-  
   async function loadDashboard() {
     const container = document.getElementById('dashboardTable');
-    container.innerHTML = '<div class="text-center text-muted my-5"><h5>正在載入最新班表...</h5><div class="spinner-border text-primary mt-2" role="status"></div></div>';
-
-    const selectedVal = document.getElementById('quarterSelect').value;
-    if (!selectedVal) return;
-
-    const [year, quarter] = selectedVal.split('-');
+    container.innerHTML = '<div class="text-center text-muted my-5"><h5>正在載入最新班表...</h5><div class="spinner-border text-primary mt-2"></div></div>';
+    const [year, quarter] = document.getElementById('quarterSelect').value.split('-');
 
     try {
-      const result = await callAPI('getSchedule', { year: year, quarter: quarter });
-      if (result.status === 'success') {
-        renderDashboardTable(result.data);
-      } else {
-        container.innerHTML = `<div class="alert alert-danger">載入失敗：${result.message}</div>`;
-      }
+      const result = await callAPI('getSchedule', { year, quarter });
+      if (result.status === 'success') renderDashboardTable(result.data);
+      else container.innerHTML = `<div class="alert alert-danger">載入失敗：${result.message}</div>`;
     } catch (error) {
-      container.innerHTML = `<div class="alert alert-danger">網路連線錯誤或 API 異常！</div>`;
+      container.innerHTML = `<div class="alert alert-danger">網路連線錯誤！</div>`;
     }
   }
 
   function renderDashboardTable(data) {
     const container = document.getElementById('dashboardTable');
     container.innerHTML = '';
-
     if (!data || data.length === 0) {
-      container.innerHTML = '<div class="alert alert-warning text-center my-4">該季度目前沒有任何排班資料。</div>';
+      container.innerHTML = '<div class="alert alert-warning text-center my-4">該季度目前沒有資料。</div>';
       return;
     }
 
@@ -220,118 +184,74 @@
     let headers = Object.keys(data[0]).filter(k => !ignoreKeys.includes(k));
 
     let table = document.createElement('table');
-    table.className = 'table table-bordered table-hover align-middle shadow-sm';
+    table.className = 'table table-bordered table-hover align-middle shadow-sm bg-white';
     table.style.fontSize = '0.9em';
 
     let thead = document.createElement('thead');
-    thead.className = 'table-primary';
+    thead.className = 'table-dark';
     let trHead = document.createElement('tr');
-    headers.forEach(h => {
-      let th = document.createElement('th');
-      th.innerText = h;
-      trHead.appendChild(th);
-    });
+    headers.forEach(h => { let th = document.createElement('th'); th.innerText = h; trHead.appendChild(th); });
     thead.appendChild(trHead);
     table.appendChild(thead);
 
     let tbody = document.createElement('tbody');
     data.forEach(row => {
       let tr = document.createElement('tr');
-
-      if (row.hasWarning) {
-        tr.classList.add('warning-row');
-      }
+      if (row.hasWarning) tr.classList.add('warning-row');
 
       headers.forEach(h => {
         let td = document.createElement('td');
         let cellText = row[h] || '';
-        
         if (h === '日期' && row.hasWarning) {
-          td.innerHTML = `
-            <strong>${cellText}</strong><br>
-            <span class="badge bg-warning text-dark mt-1 text-wrap" style="line-height: 1.2;">
-              ${row.warningMessage}
-            </span>
-          `;
+          td.innerHTML = `<strong>${cellText}</strong><br><span class="badge bg-warning text-dark mt-1 text-wrap">${row.warningMessage}</span>`;
         } else {
           td.innerText = cellText;
           if(cellText === '' || cellText === '【待定】') td.classList.add('text-muted');
-          if(cellText === '【待定】') td.style.color = '#dc3545'; // 待定顯示紅色
+          if(cellText === '【待定】') td.style.color = '#dc3545';
         }
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-    
     let responsiveDiv = document.createElement('div');
     responsiveDiv.className = 'table-responsive';
     responsiveDiv.appendChild(table);
-    
     container.appendChild(responsiveDiv);
   }
 
   // ==========================================
-  // 2. 位置設定與人員 (Settings Tab) 相關邏輯
+  // 2. 位置設定邏輯
   // ==========================================
-  
   let sortablePositions = null; 
 
   async function loadPositions() {
     const tbody = document.getElementById('positionsTbody');
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">正在載入資料...</td></tr>';
-    
-    try {
-      const result = await callAPI('getPositions', {});
-      if (result.status === 'success') {
-        renderPositions(result.data);
-      } else {
-        alert("載入失敗：" + result.message);
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">載入失敗，請重試</td></tr>';
-      }
-    } catch (error) {
-      alert("網路錯誤或 API 異常！");
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">網路連線錯誤</td></tr>';
-    }
-  }
-
-  function renderPositions(data) {
-    const tbody = document.getElementById('positionsTbody');
+    const result = await callAPI('getPositions', {});
     tbody.innerHTML = ''; 
-    
-    if (!data || data.length === 0) {
-      addPositionRow('主領', '', '是');
-    } else {
-      data.forEach(item => {
-        addPositionRow(item.positionName, item.personnel, item.isRequired || '是');
-      });
+    if (result.status === 'success') {
+      if(result.data.length === 0) addPositionRow('主領', '', '是');
+      else result.data.forEach(item => addPositionRow(item.positionName, item.personnel, item.isRequired || '是'));
+      
+      if (sortablePositions) sortablePositions.destroy();
+      sortablePositions = new Sortable(tbody, { handle: '.drag-handle', animation: 150, ghostClass: 'bg-light' });
     }
-
-    if (sortablePositions) sortablePositions.destroy();
-    sortablePositions = new Sortable(tbody, {
-      handle: '.drag-handle',
-      animation: 150,
-      ghostClass: 'bg-light'
-    });
   }
 
   function addPositionRow(posName, personnel, isRequired = "是") {
     const tbody = document.getElementById('positionsTbody');
     const tr = document.createElement('tr');
-    
     tr.innerHTML = `
-      <td class="text-center align-middle drag-handle" style="cursor: grab; font-size: 1.2em; color: #888;" title="按住拖曳排序">☰</td>
-      <td><input type="text" class="form-control pos-name" value="${posName}" placeholder="例如：吉他"></td>
-      <td><input type="text" class="form-control pos-personnel" value="${personnel}" placeholder="例如：張三,李四"></td>
+      <td class="text-center align-middle drag-handle" style="cursor: grab; font-size: 1.2em; color: #888;">☰</td>
+      <td><input type="text" class="form-control pos-name" value="${posName}"></td>
+      <td><input type="text" class="form-control pos-personnel" value="${personnel}"></td>
       <td>
         <select class="form-select pos-required">
           <option value="是" ${isRequired === "是" ? "selected" : ""}>必排</option>
           <option value="否" ${isRequired === "否" ? "selected" : ""}>非必排</option>
         </select>
       </td>
-      <td class="text-center align-middle">
-        <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button>
-      </td>
+      <td class="text-center align-middle"><button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button></td>
     `;
     tbody.appendChild(tr);
   }
@@ -339,138 +259,78 @@
   async function savePositionsToServer() {
     const rows = document.querySelectorAll('#positionsTbody tr');
     let positionsData = [];
-    
     rows.forEach(tr => {
-      const nameInput = tr.querySelector('.pos-name');
-      const personnelInput = tr.querySelector('.pos-personnel');
-      const reqInput = tr.querySelector('.pos-required');
-      
-      if (nameInput && nameInput.value.trim() !== '') {
-        positionsData.push({
-          positionName: nameInput.value.trim(),
-          personnel: personnelInput.value.trim(),
-          isRequired: reqInput ? reqInput.value : '是'
-        });
-      }
+      const nameInput = tr.querySelector('.pos-name').value.trim();
+      const personnelInput = tr.querySelector('.pos-personnel').value.trim();
+      const reqInput = tr.querySelector('.pos-required').value;
+      if (nameInput !== '') positionsData.push({ positionName: nameInput, personnel: personnelInput, isRequired: reqInput });
     });
 
     const saveBtn = event.target;
-    saveBtn.disabled = true; 
-    saveBtn.innerText = "儲存中...";
-
-    try {
-      const result = await callAPI('savePositions', { positionsData: positionsData });
-      if (result.status === 'success') {
-        alert("設定已成功儲存！");
-      } else {
-        alert("儲存失敗：" + result.message);
-      }
-    } catch (error) {
-      alert("儲存發生錯誤！");
-    } finally {
-      saveBtn.disabled = false;
-      saveBtn.innerText = "儲存設定";
-    }
+    saveBtn.disabled = true; saveBtn.innerText = "儲存中...";
+    await callAPI('savePositions', { positionsData });
+    alert("設定已成功儲存！");
+    saveBtn.disabled = false; saveBtn.innerText = "儲存設定";
   }
 
   // ==========================================
-  // 3. 服事安排 (Schedule Tab) 相關邏輯
+  // 3. 服事安排 (全新視覺化下拉選單版)
   // ==========================================
-
   let currentPositions = []; 
   let generatedScheduleData = []; 
   let fpInstance = null; 
-  window.scheduleXs = null; 
 
   async function initScheduleTab() {
-    if (!fpInstance) {
-      fpInstance = flatpickr("#multiDatePicker", {
-        mode: "multiple",
-        dateFormat: "Y-m-d",
-        locale: "zh"
-      });
-    }
-
-    try {
-      const result = await callAPI('getPositions', {});
-      if (result.status === 'success') {
-        currentPositions = result.data;
-      }
-    } catch (error) {
-      console.error("無法取得位置清單：", error);
-    }
+    if (!fpInstance) fpInstance = flatpickr("#multiDatePicker", { mode: "multiple", dateFormat: "Y-m-d", locale: "zh" });
+    const result = await callAPI('getPositions', {});
+    if (result.status === 'success') currentPositions = result.data;
   }
 
   function addSelectedDates() {
-    if (!fpInstance) return;
-    const selectedDates = fpInstance.selectedDates;
-    
-    if (selectedDates.length === 0) {
-      alert("請先在日曆上點選至少一個日期！"); return;
-    }
-
-    selectedDates.sort((a, b) => a - b);
+    if (!fpInstance || fpInstance.selectedDates.length === 0) return;
+    const selectedDates = fpInstance.selectedDates.sort((a, b) => a - b);
     selectedDates.forEach(dateObj => {
       const dateString = flatpickr.formatDate(dateObj, "Y-m-d");
-      addScheduleDateRow(dateString);
+      const div = document.createElement('div');
+      div.className = 'card mb-2 p-2 border-primary border-opacity-25 shadow-sm';
+      div.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateString}" required>
+          <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold" value="主日" placeholder="聚會類別">
+          <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.card').remove()">x</button>
+        </div>
+        <input type="text" class="form-control form-control-sm s-leave" placeholder="請假人員 (如: 王小明,李大華)">
+      `;
+      document.getElementById('dateSettingsContainer').appendChild(div);
     });
-
     fpInstance.clear();
   }
 
-  function addScheduleDateRow(dateVal = '') {
-    const container = document.getElementById('dateSettingsContainer');
-    const div = document.createElement('div');
-    div.className = 'card mb-2 p-2 schedule-date-row border-primary border-opacity-25';
-    
-    div.innerHTML = `
-      <div class="d-flex justify-content-between align-items-center mb-1">
-        <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateVal}" required>
-        <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold" value="主日" placeholder="聚會類別">
-        <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.schedule-date-row').remove()">x</button>
-      </div>
-      <input type="text" class="form-control form-control-sm s-leave" placeholder="請假人員 (如: 王小明,李大華)">
-    `;
-    container.appendChild(div);
-  }
-
   function getQuarter(dateString) {
-    const d = new Date(dateString);
-    const q = Math.floor((d.getMonth() + 3) / 3);
+    const q = Math.floor((new Date(dateString).getMonth() + 3) / 3);
     return `Q${q}`;
   }
 
   function generateSchedule() {
-    if (currentPositions.length === 0) {
-      alert("請先至「位置設定與人員」建立資料！"); return;
-    }
-
-    const rows = document.querySelectorAll('.schedule-date-row');
+    if (currentPositions.length === 0) { alert("請先建立位置資料！"); return; }
+    const rows = document.querySelectorAll('.schedule-date-row, #dateSettingsContainer .card');
     let inputConditions = [];
     rows.forEach(row => {
       const dateVal = row.querySelector('.s-date').value;
-      const typeVal = row.querySelector('.s-type').value;
-      const leaveVal = row.querySelector('.s-leave').value;
       if (dateVal) {
         inputConditions.push({
-          date: dateVal,
-          type: typeVal,
-          leaves: leaveVal.split(',').map(s => s.trim()).filter(s => s !== '') 
+          date: dateVal, type: row.querySelector('.s-type').value,
+          leaves: row.querySelector('.s-leave').value.split(',').map(s=>s.trim()).filter(s=>s) 
         });
       }
     });
 
-    if (inputConditions.length === 0) {
-      alert("請至少設定一天的聚會日期！"); return;
-    }
-
+    if (inputConditions.length === 0) { alert("請設定日期！"); return; }
     inputConditions.sort((a, b) => a.date.localeCompare(b.date));
 
-    // 建立主領輪替池
     let leaderObj = currentPositions.find(p => p.positionName === '主領');
-    let leaderMasterList = leaderObj ? leaderObj.personnel.split(',').map(s => s.trim()).filter(s => s !== '') : [];
+    let leaderMasterList = leaderObj ? leaderObj.personnel.split(',').map(s=>s.trim()).filter(s=>s) : [];
     let leaderPool = []; 
-
     let consecutiveCount = {}; 
     currentPositions.forEach(p => { consecutiveCount[p.positionName] = {}; });
     
@@ -478,214 +338,162 @@
     generatedScheduleData = [];
 
     inputConditions.forEach(dayInfo => {
-      let dailyRecord = {
-        '年度': dayInfo.date.substring(0, 4),
-        '季度': getQuarter(dayInfo.date),
-        '日期': dayInfo.date,
-        '聚會類別': dayInfo.type
-      };
-      
+      let dailyRecord = { '年度': dayInfo.date.substring(0,4), '季度': getQuarter(dayInfo.date), '日期': dayInfo.date, '聚會類別': dayInfo.type };
       let assignedToday = []; 
 
       currentPositions.forEach(posObj => {
         let posName = posObj.positionName;
-        let candidates = posObj.personnel.split(',').map(s => s.trim()).filter(s => s !== '');
+        let candidates = posObj.personnel.split(',').map(s=>s.trim()).filter(s=>s);
         let isReq = posObj.isRequired || '是';
         let selectedPerson = "";
 
         if (posName === '主領') {
-          // --- 主領全員輪替邏輯 ---
-          if (leaderPool.length === 0) {
-            leaderPool = [...leaderMasterList]; // 池子空了就重新填滿
-          }
-          
+          if (leaderPool.length === 0) leaderPool = [...leaderMasterList];
           let validLeaders = leaderPool.filter(p => !dayInfo.leaves.includes(p) && p !== previousLeader);
-          
           if (validLeaders.length > 0) {
             selectedPerson = validLeaders[Math.floor(Math.random() * validLeaders.length)];
-            leaderPool = leaderPool.filter(p => p !== selectedPerson); // 抽出後移出池子
+            leaderPool = leaderPool.filter(p => p !== selectedPerson); 
           }
         } else {
-          // --- 一般位置邏輯 ---
-          let validCandidates = candidates.filter(person => {
-            if (dayInfo.leaves.includes(person)) return false; 
-            if (assignedToday.includes(person)) return false;  
-            if ((consecutiveCount[posName][person] || 0) >= 2) return false;   
-            return true; 
-          });
-
-          if (validCandidates.length > 0) {
-            selectedPerson = validCandidates[Math.floor(Math.random() * validCandidates.length)];
-          }
+          let validCandidates = candidates.filter(p => !dayInfo.leaves.includes(p) && !assignedToday.includes(p) && (consecutiveCount[posName][p]||0)<2);
+          if (validCandidates.length > 0) selectedPerson = validCandidates[Math.floor(Math.random() * validCandidates.length)];
         }
 
-        // 必排防呆
-        if (selectedPerson === "" && isReq === "是") {
-          selectedPerson = "【待定】"; 
-        }
-
+        if (selectedPerson === "" && isReq === "是") selectedPerson = "【待定】"; 
+        
         dailyRecord[posName] = selectedPerson;
         if (selectedPerson && selectedPerson !== "【待定】") assignedToday.push(selectedPerson);
 
         candidates.forEach(person => {
-          if (person === selectedPerson) {
-            consecutiveCount[posName][person] = (consecutiveCount[posName][person] || 0) + 1;
-          } else {
-            consecutiveCount[posName][person] = 0;
-          }
+          if (person === selectedPerson) consecutiveCount[posName][person] = (consecutiveCount[posName][person] || 0) + 1;
+          else consecutiveCount[posName][person] = 0;
         });
       }); 
-
       previousLeader = dailyRecord['主領'];
       generatedScheduleData.push(dailyRecord);
     }); 
-
     renderPreviewTable(generatedScheduleData);
   }
 
   async function loadExistingSchedule() {
-    if (currentPositions.length === 0) {
-      alert("請先至「位置設定與人員」建立資料！"); return;
-    }
-
     const startDate = document.getElementById('editStartDate').value;
     const endDate = document.getElementById('editEndDate').value;
-
-    if (!startDate || !endDate) {
-      alert("請完整選擇「開始」與「結束」日期！"); return;
-    }
-
-    if (new Date(startDate) > new Date(endDate)) {
-      alert("開始日期不能晚於結束日期！"); return;
-    }
-
+    if (!startDate || !endDate) { alert("請選擇日期區間！"); return; }
+    
     const btn = event.target;
-    btn.disabled = true; 
-    btn.innerText = "讀取中...";
+    btn.disabled = true; btn.innerText = "讀取中...";
 
-    try {
-      const result = await callAPI('getScheduleByDateRange', { 
-        startDate: startDate, 
-        endDate: endDate 
-      });
-      
-      if (result.status === 'success') {
-        if (result.data.length === 0) {
-          alert("該日期區間內沒有找到任何排班資料。");
-        } else {
-          renderPreviewTable(result.data);
-          alert(`✅ 成功讀取 ${result.data.length} 天的排班資料！\n您可以直接在右側試算表修改後按下儲存。`);
-        }
-      } else {
-        alert("讀取失敗：" + result.message);
+    const result = await callAPI('getScheduleByDateRange', { startDate, endDate });
+    if (result.status === 'success') {
+      if (result.data.length === 0) alert("區間內無排班資料。");
+      else {
+        generatedScheduleData = result.data; // 綁定到全域變數，供存檔使用
+        renderPreviewTable(generatedScheduleData);
+        alert(`✅ 讀取了 ${result.data.length} 天的排班資料！`);
       }
-    } catch (error) {
-      alert("網路連線錯誤！");
-    } finally {
-      btn.disabled = false; 
-      btn.innerText = "讀取資料 📥";
-    }
+    } else alert("讀取失敗：" + result.message);
+    
+    btn.disabled = false; btn.innerText = "讀取資料 📥";
   }
 
+  // --- HTML 預覽表格與下拉選單渲染 ---
   function renderPreviewTable(data) {
-    const spreadsheetContainer = document.getElementById('schedule-spreadsheet');
+    const container = document.getElementById('previewContainer');
+    const thead = document.getElementById('previewThead');
+    const tbody = document.getElementById('previewTbody');
     const placeholder = document.getElementById('previewPlaceholder');
     const saveBtn = document.getElementById('saveScheduleBtn');
 
-    let headers = ['年度', '季度', '日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
-    let rowsData = {};
-    
-    rowsData[0] = { cells: {} };
-    headers.forEach((h, colIndex) => {
-      rowsData[0].cells[colIndex] = { text: h };
-    });
+    thead.innerHTML = ''; tbody.innerHTML = '';
 
-    data.forEach((rowObj, rowIndex) => {
-      rowsData[rowIndex + 1] = { cells: {} };
-      headers.forEach((h, colIndex) => {
-        rowsData[rowIndex + 1].cells[colIndex] = { text: rowObj[h] || '' };
+    // 產生表頭
+    let headers = ['日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
+    let trHead = document.createElement('tr');
+    headers.forEach(h => {
+      let th = document.createElement('th');
+      th.innerText = h;
+      trHead.appendChild(th);
+    });
+    thead.appendChild(trHead);
+
+    // 產生內容列與下拉選單
+    data.forEach((row, rowIndex) => {
+      let tr = document.createElement('tr');
+      
+      headers.forEach(h => {
+        let td = document.createElement('td');
+        
+        if (h === '日期') {
+          td.innerHTML = `<span class="badge bg-secondary fs-6 shadow-sm">${row[h]}</span>`;
+        } 
+        else if (h === '聚會類別') {
+          // 聚會類別使用文字輸入框
+          let input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-control form-control-sm text-center border-0 bg-light';
+          input.value = row[h] || '';
+          input.onchange = (e) => { generatedScheduleData[rowIndex][h] = e.target.value.trim(); };
+          td.appendChild(input);
+        } 
+        else {
+          // 動態產生位置的下拉選單
+          let posDef = currentPositions.find(p => p.positionName === h);
+          let candidates = posDef ? posDef.personnel.split(',').map(s=>s.trim()).filter(s=>s) : [];
+          let isReq = posDef ? (posDef.isRequired || '是') : '是';
+
+          let select = document.createElement('select');
+          select.className = 'form-select form-select-sm text-center';
+          
+          // 如果是待定，套用紅色警告樣式
+          if(row[h] === '【待定】') select.classList.add('select-danger');
+
+          // 加入預設選項 (待定 或 空白)
+          let optDefault = document.createElement('option');
+          optDefault.value = (isReq === '是') ? '【待定】' : '';
+          optDefault.text = (isReq === '是') ? '【待定】' : '無';
+          select.appendChild(optDefault);
+
+          // 加入候選人員名單
+          candidates.forEach(c => {
+            let opt = document.createElement('option');
+            opt.value = c; opt.text = c;
+            if(row[h] === c) opt.selected = true;
+            select.appendChild(opt);
+          });
+
+          // 當下拉選單改變時，同步更新背後的資料陣列，並切換顏色
+          select.onchange = function() {
+            generatedScheduleData[rowIndex][h] = this.value;
+            if (this.value === '【待定】') {
+              this.classList.add('select-danger');
+            } else {
+              this.classList.remove('select-danger');
+            }
+          };
+          td.appendChild(select);
+        }
+        tr.appendChild(td);
       });
+      tbody.appendChild(tr);
     });
-
-    const sheetData = [{
-      name: '排班結果',
-      rows: rowsData
-    }];
 
     placeholder.style.display = 'none';
-    spreadsheetContainer.style.display = 'block';
+    container.style.display = 'block';
     saveBtn.style.display = 'inline-block';
-
-    if (!window.scheduleXs) {
-      window.scheduleXs = x_spreadsheet('#schedule-spreadsheet', {
-        showToolbar: false, 
-        showGrid: true,
-        view: {
-          height: () => 400,
-          width: () => spreadsheetContainer.parentElement.clientWidth, 
-        }
-      });
-    }
-    
-    window.scheduleXs.loadData(sheetData);
   }
 
+  // 因為 generatedScheduleData 會被下拉選單自動更新，存檔邏輯變得非常簡潔！
   async function saveGeneratedSchedule() {
-    if (!window.scheduleXs) return;
-
-    const sheetData = window.scheduleXs.getData()[0];
-    if (!sheetData || !sheetData.rows) return;
-
-    const rows = sheetData.rows;
-    if (!rows[0] || !rows[0].cells) return; 
-
-    const headers = [];
-    Object.keys(rows[0].cells).forEach(colKey => {
-      headers[colKey] = rows[0].cells[colKey].text;
-    });
-
-    let finalData = [];
-    const rowKeys = Object.keys(rows).filter(k => k !== 'len').map(Number).sort((a,b) => a-b);
-    
-    rowKeys.forEach(rowIndex => {
-      if (rowIndex === 0) return; 
-      
-      let rowObj = {};
-      let hasDate = false;
-
-      headers.forEach((h, colIndex) => {
-        if (h) {
-          let cell = rows[rowIndex].cells[colIndex];
-          let text = cell ? cell.text : '';
-          rowObj[h] = text;
-          
-          if (h === '日期' && text.trim() !== '') {
-            hasDate = true;
-          }
-        }
-      });
-
-      if (hasDate) {
-        finalData.push(rowObj);
-      }
-    });
-
-    if (finalData.length === 0) {
-      alert("沒有可儲存的有效排班資料 (缺少日期)！");
-      return;
-    }
-
+    if (generatedScheduleData.length === 0) return;
     const btn = document.getElementById('saveScheduleBtn');
     btn.disabled = true; btn.innerText = '儲存中...';
 
     try {
-      const result = await callAPI('saveSchedule', { scheduleData: finalData });
+      const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
       if (result.status === 'success') {
         alert("🎉 排班表已成功儲存！");
-        switchTab('dashboard');
-      } else {
-        alert("儲存失敗：" + result.message);
-      }
+        switchTab('dashboard'); // 自動跳轉公佈欄
+      } else alert("儲存失敗：" + result.message);
     } catch (error) {
       alert("網路連線錯誤！");
     } finally {
@@ -694,74 +502,44 @@
   }
 
   // ==========================================
-  // 4. 牧師與題目與經文 (Sermon Tab) 邏輯
+  // 4. 牧師設定邏輯
   // ==========================================
-
   async function initSpreadsheet() {
-    window.xs = x_spreadsheet('#x-spreadsheet-demo', {
-      showToolbar: true,
-      showGrid: true,
-      view: {
-        height: () => 400,
-        width: () => document.getElementById('sermon').clientWidth - 30, 
-      }
-    });
-
+    window.xs = x_spreadsheet('#x-spreadsheet-demo', { showToolbar: true, showGrid: true, view: { height: () => 400, width: () => document.getElementById('sermon').clientWidth - 30 } });
     try {
       const result = await callAPI('getSermonInfo', {});
       let rowsData = { 0: { cells: { 0: {text: '日期'}, 1: {text: '牧師'}, 2: {text: '題目'}, 3: {text: '經文'} } } };
-      
       if (result.status === 'success' && result.data.length > 0) {
         result.data.forEach((row, idx) => {
-          rowsData[idx + 1] = {
-            cells: {
-              0: { text: row['日期'] || '' },
-              1: { text: row['牧師'] || '' },
-              2: { text: row['題目'] || '' },
-              3: { text: row['經文'] || '' }
-            }
-          };
+          rowsData[idx + 1] = { cells: { 0: { text: row['日期']||'' }, 1: { text: row['牧師']||'' }, 2: { text: row['題目']||'' }, 3: { text: row['經文']||'' } } };
         });
       }
-
       window.xs.loadData([{ name: '講員排程', rows: rowsData }]);
-    } catch (e) {
-      console.error("載入講員資料失敗", e);
-    }
+    } catch (e) { console.error(e); }
   }
 
   async function saveSermonData() {
     if (!window.xs) return;
-    
     const data = window.xs.getData()[0].rows;
     let finalSermonData = [];
     const headers = ['日期', '牧師', '題目', '經文'];
 
     Object.keys(data).forEach(rowIndex => {
       if (rowIndex === '0' || rowIndex === 'len') return; 
-      
-      let rowObj = {};
-      let hasData = false;
+      let rowObj = {}; let hasData = false;
       headers.forEach((h, colIndex) => {
         let text = (data[rowIndex].cells && data[rowIndex].cells[colIndex]) ? data[rowIndex].cells[colIndex].text : '';
         rowObj[h] = text;
         if (h === '日期' && text.trim() !== '') hasData = true;
       });
-      
       if (hasData) finalSermonData.push(rowObj);
     });
 
-    if (finalSermonData.length === 0) { alert("請至少填寫一個日期的資料"); return; }
-
+    if (finalSermonData.length === 0) { alert("請填寫資料"); return; }
     try {
       const result = await callAPI('saveSermonInfo', { sermonData: finalSermonData });
-      if (result.status === 'success') {
-        alert("🎉 講員資訊儲存成功！");
-        loadDashboard(); 
-      }
-    } catch (e) {
-      alert("儲存失敗，請檢查網路。");
-    }
+      if (result.status === 'success') { alert("🎉 講員資訊儲存成功！"); loadDashboard(); }
+    } catch (e) { alert("儲存失敗"); }
   }
 </script>
 </body>
