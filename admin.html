@@ -71,6 +71,10 @@
     .choices { margin-bottom: 0 !important; }
     .choices__inner { min-height: 35px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ced4da; background-color: #fff; }
     .choices__list--multiple .choices__item { background-color: #0d6efd; border: 1px solid #0a58ca; border-radius: 4px; margin-right: 5px; }
+    /* 🌟 解決下拉選單被覆蓋的問題 */
+    .choices.is-open { z-index: 9999; }
+    .choices__list--dropdown { z-index: 9999 !important; }
+    #dateSettingsContainer .card { overflow: visible !important; }
   </style>
 </head>
 <body>
@@ -373,19 +377,21 @@
     }
   }
 
-  function addSelectedDates() {
+function addSelectedDates() {
     if (!fpInstance || fpInstance.selectedDates.length === 0) { alert("請先點選日期"); return; }
     const selectedDates = fpInstance.selectedDates.sort((a, b) => a - b);
     
-    // 🌟 預先生成下拉選單的 Option HTML
+    // 預先生成下拉選單的 Option HTML
     let optionsHtml = uniquePersonnel.map(name => `<option value="${name}">${name}</option>`).join('');
 
     selectedDates.forEach(dateObj => {
       const dateString = flatpickr.formatDate(dateObj, "Y-m-d");
       const div = document.createElement('div');
+      // 🌟 預設給予相對定位與基礎圖層
       div.className = 'card mb-2 p-2 border-primary border-opacity-25 shadow-sm';
-      
-      // 🌟 將原本的 input 替換成 select multiple
+      div.style.position = 'relative'; 
+      div.style.zIndex = '1';
+
       div.innerHTML = `
         <div class="d-flex justify-content-between align-items-center mb-2">
           <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateString}" required>
@@ -398,19 +404,27 @@
       `;
       document.getElementById('dateSettingsContainer').appendChild(div);
 
-      // 🌟 套用 Choices.js 讓它變成精美的標籤多選工具
+      // 套用 Choices.js
       const selectElement = div.querySelector('.s-leave');
-      new Choices(selectElement, {
+      const choicesInstance = new Choices(selectElement, {
         removeItemButton: true,
         searchPlaceholderValue: '搜尋人員...',
         placeholderValue: '🔍 點選請假人員',
         noResultsText: '找不到此人',
         itemSelectText: '' 
       });
+
+      // 🌟 終極解法：當選單打開時，把這張卡片的圖層拉到最上層；關閉時降回來
+      selectElement.addEventListener('showDropdown', function() {
+        div.style.zIndex = '999';
+      });
+      selectElement.addEventListener('hideDropdown', function() {
+        div.style.zIndex = '1';
+      });
     });
     fpInstance.clear();
   }
-
+  
   function getQuarter(dateString) {
     return `Q${Math.floor((new Date(dateString).getMonth() + 3) / 3)}`;
   }
