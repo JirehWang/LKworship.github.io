@@ -55,22 +55,52 @@
 </div>
 
 <script>
-  // 🌟 重要：請將此處換成您 GAS 部署後的正式網址
   const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
+  
+  // 🌟 新增一個全域變數，用來掌控目前的 fetch 請求
+  let currentAbortController = null;
 
   async function loadDashboard() {
     const wrapper = document.getElementById('tableWrapper');
     const [year, quarter] = document.getElementById('quarterSelect').value.split('-');
 
+    // 切換選單時，立刻顯示載入中動畫（蓋掉舊資料）
+    wrapper.innerHTML = `
+      <div class="text-center p-5 text-muted" id="loadingMsg">
+        <div class="spinner-border text-primary mb-2"></div>
+        <div>正在同步 ${year}-${quarter} 最新資料...</div>
+      </div>
+    `;
+
+    // 🌟 如果上一個請求還沒跑完，直接中斷它！
+    if (currentAbortController) {
+      currentAbortController.abort();
+    }
+    
+    // 🌟 建立一個新的中斷控制器，並指派給這次的請求
+    currentAbortController = new AbortController();
+    const signal = currentAbortController.signal;
+
     try {
       const response = await fetch(API_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'getSchedule', year: year, quarter: quarter })
+        body: JSON.stringify({ action: 'getSchedule', year: year, quarter: quarter }),
+        signal: signal // 🌟 把中斷訊號傳進 fetch 裡面
       });
+      
       const result = await response.json();
-      if (result.status === 'success') renderTable(result.data);
+      if (result.status === 'success') {
+        renderTable(result.data);
+      } else {
+        wrapper.innerHTML = `<div class="alert alert-danger m-3">載入失敗：${result.message}</div>`;
+      }
     } catch (e) {
-      wrapper.innerHTML = '<div class="alert alert-danger m-3">載入失敗，請檢查網路連線。</div>';
+      // 🌟 當前一個請求被我們手動中斷時，會觸發 AbortError。這不是真正的網路錯誤，所以忽略它。
+      if (e.name === 'AbortError') {
+        console.log('已捨棄前一次的查詢請求。');
+      } else {
+        wrapper.innerHTML = '<div class="alert alert-danger m-3">載入失敗，請檢查網路連線。</div>';
+      }
     }
   }
 
