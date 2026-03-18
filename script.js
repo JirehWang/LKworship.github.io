@@ -8,14 +8,12 @@ let fpInstance = null;
 let uniquePersonnel = []; 
 let currentLeaveCard = null; 
 let sortablePositions = null; 
-let currentAbortController = null; // 🌟 新增：用於控制 fetch 中斷
+let currentAbortController = null;
 
 // --- 初始化 ---
 window.onload = () => {
   const syncTimeEl = document.getElementById('syncTime');
-  if (syncTimeEl) {
-    syncTimeEl.innerText = new Date().toLocaleTimeString();
-  }
+  if (syncTimeEl) syncTimeEl.innerText = new Date().toLocaleTimeString();
   loadDashboard();
 };
 
@@ -32,10 +30,8 @@ async function callAPI(action, payload) {
 function switchTab(tabId) {
   const content = document.getElementById(tabId);
   if (!content) return;
-
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
-  
   content.classList.add('active');
   const activeLink = document.querySelector(`a[onclick="switchTab('${tabId}')"]`);
   if (activeLink) activeLink.classList.add('active');
@@ -47,7 +43,7 @@ function switchTab(tabId) {
 }
 
 // ==========================================
-// 1. 公佈欄邏輯 (支援中斷與多頁面)
+// 1. 公佈欄邏輯 (支援中斷請求)
 // ==========================================
 async function loadDashboard() {
   const container = document.getElementById('dashboardContainer');
@@ -55,48 +51,27 @@ async function loadDashboard() {
   if (!container || !quarterSelect) return;
 
   const [year, quarter] = quarterSelect.value.split('-');
-  
-  // 顯示載入動畫並清空舊資料
-  container.innerHTML = `
-    <div class="text-center p-5 text-primary">
-      <div class="spinner-border"></div>
-      <div class="mt-2">正在載入 ${year}-${quarter} 最新班表...</div>
-    </div>
-  `;
+  container.innerHTML = `<div class="text-center p-5 text-primary"><div class="spinner-border"></div><div class="mt-2">同步 ${year}-${quarter} 資料中...</div></div>`;
 
-  // 🌟 處理連鎖請求：中斷上一個尚未完成的請求
   if (currentAbortController) currentAbortController.abort();
   currentAbortController = new AbortController();
-  const signal = currentAbortController.signal;
 
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'getSchedule', year: year, quarter: quarter }),
-      signal: signal
-    });
-    
-    const result = await response.json();
+    const result = await callAPI('getSchedule', { year, quarter });
     if (result.status === 'success') {
       const syncTimeEl = document.getElementById('syncTime');
       if (syncTimeEl) syncTimeEl.innerText = new Date().toLocaleTimeString();
       renderDashboardTable(result.data);
-    } else {
-      container.innerHTML = `<div class="alert alert-danger m-3">載入失敗：${result.message}</div>`;
     }
   } catch (error) {
-    if (error.name === 'AbortError') {
-      console.log('已捨棄舊的季度請求');
-    } else {
-      container.innerHTML = `<div class="alert alert-danger m-3">網路連線錯誤！</div>`;
-    }
+    if (error.name !== 'AbortError') container.innerHTML = `<div class="alert alert-danger">連線錯誤</div>`;
   }
 }
 
 function renderDashboardTable(data) {
   const container = document.getElementById('dashboardContainer');
   if (!data || data.length === 0) {
-    container.innerHTML = '<div class="alert alert-warning text-center m-4">該季度目前沒有排班資料。</div>';
+    container.innerHTML = '<div class="alert alert-warning text-center m-4">本季度暫無資料。</div>';
     return;
   }
   const fixedHeaders = ['日期', '聚會類別', '牧師', '題目', '經文'];
@@ -107,7 +82,6 @@ function renderDashboardTable(data) {
   let html = `<table class="modern-table"><thead><tr>`;
   finalHeaders.forEach(h => html += `<th>${h}</th>`);
   html += `</tr></thead><tbody>`;
-  
   data.forEach(row => {
     html += `<tr class="${row.hasWarning ? 'warning-row' : ''}">`;
     finalHeaders.forEach(h => {
@@ -115,8 +89,8 @@ function renderDashboardTable(data) {
       if (h === '日期') {
         html += `<td><strong>${val}</strong>${row.hasWarning ? `<span class="warning-text">⚠️ ${row.warningMessage}</span>` : ''}</td>`;
       } else {
-        let extraClass = (val === '【待定】') ? 'text-danger fw-bold' : '';
-        html += `<td class="${extraClass}">${val || '<span class="text-black-50">-</span>'}</td>`;
+        let style = (val === '【待定】') ? 'text-danger fw-bold' : '';
+        html += `<td class="${style}">${val || '-'}</td>`;
       }
     });
     html += `</tr>`;
@@ -134,10 +108,9 @@ async function loadPositions() {
   const result = await callAPI('getPositions', {});
   tbody.innerHTML = ''; 
   if (result.status === 'success') {
-    if(result.data.length === 0) addPositionRow('主領', '', '是');
-    else result.data.forEach(item => addPositionRow(item.positionName, item.personnel, item.isRequired || '是'));
+    result.data.length === 0 ? addPositionRow('主領', '', '是') : result.data.forEach(i => addPositionRow(i.positionName, i.personnel, i.isRequired || '是'));
     if (sortablePositions) sortablePositions.destroy();
-    sortablePositions = new Sortable(tbody, { handle: '.drag-handle', animation: 150, ghostClass: 'bg-light' });
+    sortablePositions = new Sortable(tbody, { handle: '.drag-handle', animation: 150 });
   }
 }
 
@@ -145,11 +118,11 @@ function addPositionRow(posName, personnel, isRequired = "是") {
   const tbody = document.getElementById('positionsTbody');
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td class="text-center align-middle drag-handle" style="cursor: grab; font-size: 1.2em; color: #adb5bd;">☰</td>
+    <td class="text-center align-middle drag-handle" style="cursor: grab; color: #adb5bd;">☰</td>
     <td><input type="text" class="form-control form-control-sm pos-name text-center" value="${posName}"></td>
-    <td><input type="text" class="form-control form-control-sm pos-personnel" value="${personnel}" placeholder="如：張三,李四"></td>
-    <td><select class="form-select form-select-sm pos-required text-center"><option value="是" ${isRequired === "是" ? "selected" : ""}>必排</option><option value="否" ${isRequired === "否" ? "selected" : ""}>非必排</option></select></td>
-    <td class="text-center align-middle"><button class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button></td>
+    <td><input type="text" class="form-control form-control-sm pos-personnel" value="${personnel}"></td>
+    <td><select class="form-select form-select-sm pos-required"><option value="是" ${isRequired === "是" ? "selected" : ""}>必排</option><option value="否" ${isRequired === "否" ? "selected" : ""}>非必排</option></select></td>
+    <td class="text-center"><button class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">x</button></td>
   `;
   tbody.appendChild(tr);
 }
@@ -158,23 +131,18 @@ async function savePositionsToServer() {
   const rows = document.querySelectorAll('#positionsTbody tr');
   let positionsData = [];
   rows.forEach(tr => {
-    const nameInput = tr.querySelector('.pos-name').value.trim();
-    const personnelInput = tr.querySelector('.pos-personnel').value.trim();
-    const reqInput = tr.querySelector('.pos-required').value;
-    if (nameInput !== '') positionsData.push({ positionName: nameInput, personnel: personnelInput, isRequired: reqInput });
+    const name = tr.querySelector('.pos-name').value.trim();
+    if (name) positionsData.push({ positionName: name, personnel: tr.querySelector('.pos-personnel').value.trim(), isRequired: tr.querySelector('.pos-required').value });
   });
-
   const btn = document.querySelector('button[onclick="savePositionsToServer()"]');
-  if (btn) { btn.disabled = true; btn.innerText = "儲存中..."; }
-  
+  btn.disabled = true;
   await callAPI('savePositions', { positionsData });
-  alert("✅ 設定已成功儲存！");
-  
-  if (btn) { btn.disabled = false; btn.innerText = "儲存設定"; }
+  alert("✅ 儲存成功！");
+  btn.disabled = false;
 }
 
 // ==========================================
-// 3. 服事安排邏輯 (含彈窗請假)
+// 3. 服事安排 (排班演算法)
 // ==========================================
 async function initScheduleTab() {
   if (!fpInstance) fpInstance = flatpickr("#multiDatePicker", { mode: "multiple", dateFormat: "Y-m-d", locale: "zh" });
@@ -182,27 +150,21 @@ async function initScheduleTab() {
   if (result.status === 'success') {
     currentPositions = result.data;
     let nameSet = new Set();
-    currentPositions.forEach(pos => {
-      if (pos.personnel) pos.personnel.split(',').forEach(name => {
-        let cleanName = name.trim();
-        if (cleanName !== '') nameSet.add(cleanName);
-      });
-    });
+    currentPositions.forEach(pos => pos.personnel?.split(',').forEach(n => n.trim() && nameSet.add(n.trim())));
     uniquePersonnel = Array.from(nameSet).sort();
   }
 }
 
 function addSelectedDates() {
-  if (!fpInstance || fpInstance.selectedDates.length === 0) { alert("請先點選日期"); return; }
-  const selectedDates = fpInstance.selectedDates.sort((a, b) => a - b);
-  selectedDates.forEach(dateObj => {
+  if (!fpInstance?.selectedDates.length) { alert("請先點選日期"); return; }
+  fpInstance.selectedDates.sort((a, b) => a - b).forEach(dateObj => {
     const dateString = flatpickr.formatDate(dateObj, "Y-m-d");
     const div = document.createElement('div');
     div.className = 'card mb-2 p-2 border-primary border-opacity-25 shadow-sm';
     div.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateString}" required>
-        <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold text-center" value="主日" placeholder="聚會類別">
+        <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateString}">
+        <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold text-center" value="主日">
         <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.card').remove()">x</button>
       </div>
       <button class="btn btn-outline-secondary btn-sm w-100" onclick="openLeaveModal(this)">🔍 點選請假人員...</button>
@@ -214,185 +176,174 @@ function addSelectedDates() {
   fpInstance.clear();
 }
 
-function openLeaveModal(btnElement) {
-  currentLeaveCard = btnElement.closest('.card');
-  const dateVal = currentLeaveCard.querySelector('.s-date').value;
-  document.getElementById('leaveModalDate').innerText = `(${dateVal})`;
+function openLeaveModal(btn) {
+  currentLeaveCard = btn.closest('.card');
   const currentLeaves = currentLeaveCard.querySelector('.s-leave').value.split(',').filter(x => x);
   let html = '<div class="row g-2">';
   uniquePersonnel.forEach(name => {
     const isChecked = currentLeaves.includes(name) ? 'checked' : '';
     html += `<div class="col-6 col-sm-4"><div class="form-check"><input class="form-check-input leave-checkbox" type="checkbox" value="${name}" id="chk_${name}" ${isChecked}><label class="form-check-label" for="chk_${name}">${name}</label></div></div>`;
   });
-  html += '</div>';
-  document.getElementById('leaveModalBody').innerHTML = html;
+  document.getElementById('leaveModalBody').innerHTML = html + '</div>';
   bootstrap.Modal.getOrCreateInstance(document.getElementById('leaveModal')).show();
 }
 
 function confirmLeaveSelection() {
-  if (!currentLeaveCard) return;
-  const checkedBoxes = document.querySelectorAll('.leave-checkbox:checked');
-  const selectedNames = Array.from(checkedBoxes).map(cb => cb.value);
-  currentLeaveCard.querySelector('.s-leave').value = selectedNames.join(',');
-  const badgeContainer = currentLeaveCard.querySelector('.leave-badges');
-  badgeContainer.innerHTML = selectedNames.map(name => `<span class="badge bg-secondary me-1 mb-1 shadow-sm">${name}</span>`).join('');
+  const selected = Array.from(document.querySelectorAll('.leave-checkbox:checked')).map(cb => cb.value);
+  currentLeaveCard.querySelector('.s-leave').value = selected.join(',');
+  currentLeaveCard.querySelector('.leave-badges').innerHTML = selected.map(n => `<span class="badge bg-secondary me-1 mb-1">${n}</span>`).join('');
   bootstrap.Modal.getOrCreateInstance(document.getElementById('leaveModal')).hide();
 }
 
-function getQuarter(dateString) { return `Q${Math.floor((new Date(dateString).getMonth() + 3) / 3)}`; }
-
 function generateSchedule() {
-  if (currentPositions.length === 0) { alert("請先至設定頁建立位置資料！"); return; }
   const rows = document.querySelectorAll('#dateSettingsContainer .card');
   let inputConditions = [];
   rows.forEach(row => {
-    const dateVal = row.querySelector('.s-date').value;
-    if (dateVal) inputConditions.push({ date: dateVal, type: row.querySelector('.s-type').value.trim(), leaves: row.querySelector('.s-leave').value.split(',').map(s=>s.trim()).filter(s=>s) });
+    const date = row.querySelector('.s-date').value;
+    if (date) inputConditions.push({ date, type: row.querySelector('.s-type').value.trim(), leaves: row.querySelector('.s-leave').value.split(',').filter(x => x) });
   });
-  if (inputConditions.length === 0) { alert("請設定至少一天日期！"); return; }
+  if (!inputConditions.length) return alert("請設定日期");
   inputConditions.sort((a, b) => a.date.localeCompare(b.date));
 
-  let leaderObj = currentPositions.find(p => p.positionName === '主領');
-  let leaderMasterList = leaderObj ? leaderObj.personnel.split(',').map(s=>s.trim()).filter(s=>s) : [];
-  let leaderPool = []; 
-  let consecutiveCount = {}; 
-  currentPositions.forEach(p => { consecutiveCount[p.positionName] = {}; });
-  let previousLeader = null; 
+  let leaderPool = [], previousLeader = null, consecutive = {};
+  currentPositions.forEach(p => consecutive[p.positionName] = {});
   generatedScheduleData = [];
 
-  inputConditions.forEach(dayInfo => {
-    let dailyRecord = { '年度': dayInfo.date.substring(0,4), '季度': getQuarter(dayInfo.date), '日期': dayInfo.date, '聚會類別': dayInfo.type };
-    let assignedToday = []; 
-    currentPositions.forEach(posObj => {
-      let posName = posObj.positionName;
-      let candidates = posObj.personnel.split(',').map(s=>s.trim()).filter(s=>s);
-      let isReq = posObj.isRequired || '是';
-      let selectedPerson = "";
-      if (posName === '主領') {
-        if (leaderPool.length === 0) leaderPool = [...leaderMasterList];
-        let validLeaders = leaderPool.filter(p => !dayInfo.leaves.includes(p) && p !== previousLeader);
-        if (validLeaders.length > 0) { selectedPerson = validLeaders[Math.floor(Math.random() * validLeaders.length)]; leaderPool = leaderPool.filter(p => p !== selectedPerson); }
+  inputConditions.forEach(day => {
+    let daily = { '年度': day.date.substring(0,4), '季度': getQuarter(day.date), '日期': day.date, '聚會類別': day.type }, assigned = [];
+    currentPositions.forEach(pos => {
+      let name = pos.positionName, candidates = pos.personnel.split(',').map(s => s.trim()).filter(x => x), pick = "";
+      if (name === '主領') {
+        if (!leaderPool.length) leaderPool = [...candidates];
+        let valid = leaderPool.filter(p => !day.leaves.includes(p) && p !== previousLeader);
+        if (valid.length) { pick = valid[Math.floor(Math.random()*valid.length)]; leaderPool = leaderPool.filter(p => p !== pick); }
       } else {
-        let validCandidates = candidates.filter(p => !dayInfo.leaves.includes(p) && !assignedToday.includes(p) && (consecutiveCount[posName][p]||0)<2);
-        if (validCandidates.length > 0) selectedPerson = validCandidates[Math.floor(Math.random() * validCandidates.length)];
+        let valid = candidates.filter(p => !day.leaves.includes(p) && !assigned.includes(p) && (consecutive[name][p]||0) < 2);
+        if (valid.length) pick = valid[Math.floor(Math.random()*valid.length)];
       }
-      if (selectedPerson === "" && isReq === "是") selectedPerson = "【待定】"; 
-      dailyRecord[posName] = selectedPerson;
-      if (selectedPerson && selectedPerson !== "【待定】") assignedToday.push(selectedPerson);
-      candidates.forEach(person => { if (person === selectedPerson) consecutiveCount[posName][person] = (consecutiveCount[posName][person] || 0) + 1; else consecutiveCount[posName][person] = 0; });
-    }); 
-    previousLeader = dailyRecord['主領'];
-    generatedScheduleData.push(dailyRecord);
-  }); 
+      pick = pick || (pos.isRequired === '是' ? "【待定】" : "");
+      daily[name] = pick;
+      if (pick && pick !== "【待定】") assigned.push(pick);
+      candidates.forEach(c => consecutive[name][c] = (c === pick ? (consecutive[name][c]||0)+1 : 0));
+    });
+    previousLeader = daily['主領'];
+    generatedScheduleData.push(daily);
+  });
   renderPreviewTable(generatedScheduleData);
 }
 
-async function loadExistingSchedule() {
-  const startDate = document.getElementById('editStartDate').value;
-  const endDate = document.getElementById('editEndDate').value;
-  if (!startDate || !endDate) { alert("請選擇日期區間！"); return; }
-  const result = await callAPI('getScheduleByDateRange', { startDate, endDate });
-  if (result.status === 'success' && result.data.length > 0) { generatedScheduleData = result.data; renderPreviewTable(generatedScheduleData); } else { alert("查無資料或讀取失敗"); }
-}
-
 function renderPreviewTable(data) {
-  const container = document.getElementById('previewContainer');
-  const thead = document.getElementById('previewThead');
-  const tbody = document.getElementById('previewTbody');
-  if (!thead || !tbody) return;
+  const thead = document.getElementById('previewThead'), tbody = document.getElementById('previewTbody');
   thead.innerHTML = ''; tbody.innerHTML = '';
   let headers = ['日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
-  let trHead = document.createElement('tr');
-  headers.forEach(h => { let th = document.createElement('th'); th.innerText = h; trHead.appendChild(th); });
-  thead.appendChild(trHead);
-  data.forEach((row, rowIndex) => {
+  let trH = document.createElement('tr');
+  headers.forEach(h => { let th = document.createElement('th'); th.innerText = h; trH.appendChild(th); });
+  thead.appendChild(trH);
+
+  data.forEach((row, idx) => {
     let tr = document.createElement('tr');
     headers.forEach(h => {
       let td = document.createElement('td');
-      if (h === '日期') td.innerHTML = `<span class="badge bg-secondary fs-6 shadow-sm">${row[h]}</span>`;
+      if (h === '日期') td.innerHTML = `<span class="badge bg-secondary">${row[h]}</span>`;
       else if (h === '聚會類別') {
-        let input = document.createElement('input'); input.className = 'form-control form-control-sm text-center border-0 bg-transparent fw-bold text-primary'; input.value = row[h];
-        input.onchange = (e) => { generatedScheduleData[rowIndex][h] = e.target.value.trim(); };
+        let input = document.createElement('input'); input.className = 'form-control form-control-sm text-center border-0 bg-transparent fw-bold text-primary';
+        input.value = row[h]; input.onchange = (e) => generatedScheduleData[idx][h] = e.target.value.trim();
         td.appendChild(input);
       } else {
-        let posDef = currentPositions.find(p => p.positionName === h);
-        let candidates = posDef ? posDef.personnel.split(',').map(s=>s.trim()).filter(s=>s) : [];
-        let select = document.createElement('select'); select.className = 'form-select form-select-sm text-center bg-transparent border-0';
-        if(row[h] === '【待定】') select.classList.add('select-danger');
-        let optDef = document.createElement('option'); optDef.value = (posDef?.isRequired==='是'?'【待定】':''); optDef.text = (posDef?.isRequired==='是'?'【待定】':'無');
-        select.appendChild(optDef);
-        candidates.forEach(c => { let opt = document.createElement('option'); opt.value = c; opt.text = c; if(row[h] === c) opt.selected = true; select.appendChild(opt); });
-        select.onchange = function() {
-          let newValue = this.value;
-          if (newValue !== '' && newValue !== '【待定】') {
-            let dups = []; 
-            currentPositions.forEach(p => { if (p.positionName !== h && generatedScheduleData[rowIndex][p.positionName] === newValue) dups.push(p.positionName); });
-            if (dups.length > 0 && !confirm(`⚠️ [${newValue}] 這天已安排為【${dups.join('、')}】。確定要重複安排嗎？`)) { this.value = row[h]; return; }
+        let pos = currentPositions.find(p => p.positionName === h), cands = pos?.personnel.split(',').map(s=>s.trim()).filter(x=>x) || [];
+        let sel = document.createElement('select'); sel.className = 'form-select form-select-sm text-center border-0 bg-transparent';
+        if (row[h] === '【待定】') sel.classList.add('select-danger');
+        sel.innerHTML = `<option value="${pos?.isRequired==='是'?'【待定】':''}">${pos?.isRequired==='是'?'【待定】':'無'}</option>` + cands.map(c => `<option value="${c}" ${row[h]===c?'selected':''}>${c}</option>`).join('');
+        sel.onchange = function() {
+          let val = this.value;
+          if (val && val !== '【待定】') {
+            let dups = currentPositions.filter(p => p.positionName !== h && generatedScheduleData[idx][p.positionName] === val);
+            if (dups.length && !confirm(`⚠️ ${val} 已安排為 ${dups.map(p=>p.positionName)}，確定重複？`)) return this.value = row[h];
           }
-          generatedScheduleData[rowIndex][h] = newValue;
-          if(newValue === '【待定】') this.classList.add('select-danger'); else this.classList.remove('select-danger');
+          generatedScheduleData[idx][h] = val;
+          val === '【待定】' ? this.classList.add('select-danger') : this.classList.remove('select-danger');
         };
-        td.appendChild(select);
+        td.appendChild(sel);
       }
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
   });
   document.getElementById('previewPlaceholder').style.display = 'none';
-  container.style.display = 'block'; document.getElementById('saveScheduleBtn').style.display = 'inline-block';
-}
-
-async function saveGeneratedSchedule() {
-  const btn = document.getElementById('saveScheduleBtn'); 
-  if (btn) btn.disabled = true;
-  const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
-  if (result.status === 'success') { alert("🎉 排班表發佈成功！"); switchTab('dashboard'); }
-  if (btn) btn.disabled = false;
+  document.getElementById('previewContainer').style.display = 'block';
+  document.getElementById('saveScheduleBtn').style.display = 'inline-block';
 }
 
 // ==========================================
-// 4. 牧師登錄邏輯
+// 4. 牧師登錄 (AI 智慧功能)
 // ==========================================
+
+/**
+ * 🌟 核心：AI 智慧解析
+ */
+async function aiParseSermon() {
+  const textArea = document.getElementById('sermonPasteArea'), text = textArea.value.trim(), btn = document.getElementById('aiBtn');
+  if (!text) return alert("請貼入文字");
+  btn.disabled = true; btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 解析中...`;
+
+  try {
+    const result = await callAPI('parseSermonWithAI', { text });
+    if (result.status === 'success') {
+      result.data.forEach(item => {
+        let rows = document.querySelectorAll('#sermonTbody tr'), found = false;
+        for (let tr of rows) {
+          const d = tr.querySelector('.sermon-date').value, t = tr.querySelector('.sermon-type').value.trim();
+          if (d === item.日期 && t === item.聚會類別) {
+            tr.querySelector('.sermon-pastor').value = item.牧師 || "";
+            tr.querySelector('.sermon-title').value = item.題目 || "";
+            tr.querySelector('.sermon-scripture').value = item.經文 || "";
+            tr.classList.add('table-success-flash'); setTimeout(() => tr.classList.remove('table-success-flash'), 1500);
+            found = true; break;
+          }
+        }
+        if (!found) addSermonRow(item.日期, item.聚會類別, item.牧師, item.題目, item.經文);
+      });
+      textArea.value = "";
+    }
+  } catch (e) { alert("AI 解析失敗"); }
+  btn.disabled = false; btn.innerHTML = "✨ AI 智慧解析";
+}
+
 async function loadSermonData() {
   const tbody = document.getElementById('sermonTbody');
-  if (!tbody) return;
   const result = await callAPI('getSermonInfo', {});
   tbody.innerHTML = '';
-  if (result.status === 'success' && result.data.length > 0) result.data.forEach(row => addSermonRow(row['日期'], row['牧師'], row['題目'], row['經文']));
-  else addSermonRow('', '', '', '');
+  result.status === 'success' && result.data.length ? result.data.forEach(r => addSermonRow(r.日期, r.聚會類別, r.牧師, r.題目, r.經文)) : addSermonRow('', '主日', '', '', '');
 }
 
-function addSermonRow(date, pastor, title, scripture) {
-  const tbody = document.getElementById('sermonTbody');
-  const tr = document.createElement('tr');
+function addSermonRow(date, type, pastor, title, scripture) {
+  const tbody = document.getElementById('sermonTbody'), tr = document.createElement('tr');
   tr.innerHTML = `
     <td><input type="date" class="form-control form-control-sm sermon-date" value="${date}"></td>
+    <td><input type="text" class="form-control form-control-sm sermon-type text-center" value="${type || '主日'}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}"></td>
-    <td class="text-center align-middle"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">x</button></td>
+    <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">x</button></td>
   `;
   tbody.appendChild(tr);
 }
 
-function handleSermonPaste(e) {
-  e.preventDefault(); 
-  let pasteData = (e.clipboardData || window.clipboardData).getData('text');
-  pasteData.split(/\r?\n/).forEach(rowStr => {
-    let cols = rowStr.split('\t'); if (!cols[0] || cols[0].includes('日期')) return;
-    addSermonRow(cols[0].trim().replace(/\//g, '-'), cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim());
-  });
-}
-
 async function saveSermonData() {
-  let finalSermonData = [];
+  let data = [];
   document.querySelectorAll('#sermonTbody tr').forEach(tr => {
-    let date = tr.querySelector('.sermon-date').value;
-    if (date) finalSermonData.push({ '日期': date, '牧師': tr.querySelector('.sermon-pastor').value.trim(), '題目': tr.querySelector('.sermon-title').value.trim(), '經文': tr.querySelector('.sermon-scripture').value.trim() });
+    let d = tr.querySelector('.sermon-date').value;
+    if (d) data.push({ '日期': d, '聚會類別': tr.querySelector('.sermon-type').value.trim(), '牧師': tr.querySelector('.sermon-pastor').value.trim(), '題目': tr.querySelector('.sermon-title').value.trim(), '經文': tr.querySelector('.sermon-scripture').value.trim() });
   });
   const btn = document.querySelector('button[onclick="saveSermonData()"]');
-  if (btn) { btn.disabled = true; btn.innerText = "儲存中..."; }
-  await callAPI('saveSermonInfo', { sermonData: finalSermonData });
-  alert("✅ 講員資訊儲存成功！"); switchTab('dashboard');
-  if (btn) { btn.disabled = false; btn.innerText = "儲存至資料庫"; }
+  btn.disabled = true;
+  await callAPI('saveSermonInfo', { sermonData: data });
+  alert("✅ 講員資訊已儲存！"); btn.disabled = false; switchTab('dashboard');
+}
+
+async function saveGeneratedSchedule() {
+  const btn = document.getElementById('saveScheduleBtn'); btn.disabled = true;
+  const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
+  if (result.status === 'success') { alert("🎉 排班表發佈成功！"); switchTab('dashboard'); }
+  btn.disabled = false;
 }
