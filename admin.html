@@ -94,16 +94,36 @@
   <div id="sermon" class="tab-content">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5 class="fw-bold">📖 牧師、題目與經文快速登錄</h5>
-      <button class="btn btn-success fw-bold px-4" onclick="saveSermonData()">儲存至資料庫</button>
+      <div>
+        <button class="btn btn-primary fw-bold px-3 me-2" onclick="aiParseSermon()" id="aiBtn">✨ AI 智慧解析</button>
+        <button class="btn btn-success fw-bold px-4" onclick="saveSermonData()">儲存至資料庫</button>
+      </div>
     </div>
-    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light shadow-sm" rows="2" placeholder="📋 貼上 Excel 資料..." onpaste="handleSermonPaste(event)"></textarea>
+    
+    <div class="alert alert-info shadow-sm border-0 small">
+      💡 <strong>兩種輸入方式：</strong><br>
+      1. <strong>貼上 Excel：</strong>複製 Excel 內容貼上，系統瞬間轉為表格！<br>
+      2. <strong>AI 智慧解析：</strong>貼上牧師傳來的 Line 訊息（無固定格式），點擊上方「AI 智慧解析」按鈕自動抓取。
+    </div>
+
+    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light shadow-sm" rows="5" placeholder="📋 在此貼上 Excel 資料，或要讓 AI 解析的訊息內容..." onpaste="handleSermonPaste(event)"></textarea>
+    
     <div class="table-responsive bg-white rounded-3 shadow-sm border mb-3">
       <table class="table table-hover mb-0 align-middle">
-        <thead class="table-dark text-center"><tr><th>日期</th><th>聚會類型</th><th>牧師</th><th>題目</th><th>經文</th><th>操作</th></tr></thead>
+        <thead class="table-dark text-center">
+          <tr>
+            <th style="width: 15%">日期</th>
+            <th style="width: 15%">聚會類型</th>
+            <th style="width: 15%">牧師</th>
+            <th style="width: 30%">題目</th>
+            <th style="width: 20%">經文</th>
+            <th style="width: 5%">操作</th>
+          </tr>
+        </thead>
         <tbody id="sermonTbody"></tbody>
       </table>
     </div>
-    <button class="btn btn-outline-secondary w-100 fw-bold" onclick="addSermonRow('', '', '', '')">+ 手動新增一列</button>
+    <button class="btn btn-outline-secondary w-100 fw-bold" onclick="addSermonRow('', '主日', '', '', '')">+ 手動新增一列</button>
   </div>
 </div>
 
