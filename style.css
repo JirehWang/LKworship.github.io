@@ -1,21 +1,20 @@
-/* ==========================================
-   1. 基礎佈局與容器
-   ========================================== */
+/* style.css */
 body { background-color: #f8f9fa; font-family: "Microsoft JhengHei", sans-serif; padding: 15px; }
 
+/* 容器樣式 */
 .container, .main-card { 
   background-color: #fff; padding: 20px; border-radius: 12px; 
   box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 1400px; margin: auto; 
 }
 
+/* 頁籤內容控制 */
 .tab-content { display: none; padding-top: 20px; }
 .tab-content.active { display: block; }
 
+/* 季度選擇區塊 */
 .quarter-box { background: #e9ecef; padding: 12px; border-radius: 8px; margin-bottom: 15px; }
 
-/* ==========================================
-   2. 表格滾動與凍結窗格 (核心)
-   ========================================== */
+/* 🌟 表格滾動與凍結窗格核心邏輯 */
 .table-scroll-container { 
   background: white; border-radius: 8px; overflow-x: auto; 
   border: 1px solid #dee2e6; position: relative; 
@@ -25,19 +24,19 @@ body { background-color: #f8f9fa; font-family: "Microsoft JhengHei", sans-serif;
   width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; 
 }
 
-/* 表頭 */
+/* 表頭樣式 */
 .modern-table th, .bulletin-table th { 
   background-color: #2c3e50; color: white; text-align: center; 
   padding: 15px 10px; white-space: nowrap; position: sticky; top: 0; z-index: 10; 
 }
 
-/* 單元格內容與折行 */
+/* 單元格與文字折行 */
 .modern-table td, .bulletin-table td { 
   vertical-align: middle; text-align: center; padding: 12px 10px; border-bottom: 1px solid #eee;
   max-width: 180px; white-space: normal !important; word-break: break-all; line-height: 1.5; font-size: 1rem;
 }
 
-/* 🌟 凍結前兩欄 (日期、類別) */
+/* 🌟 凍結前兩欄（日期與類別） */
 .modern-table th:nth-child(1), .modern-table td:nth-child(1),
 .bulletin-table th:nth-child(1), .bulletin-table td:nth-child(1) { 
   position: sticky; left: 0; width: 110px; z-index: 5; background-color: #fff; 
@@ -49,41 +48,20 @@ body { background-color: #f8f9fa; font-family: "Microsoft JhengHei", sans-serif;
   box-shadow: 2px 0 5px rgba(0,0,0,0.05); 
 }
 
-/* 確保凍結表頭不被覆蓋 */
+/* 確保凍結的表頭在最上層 */
 .modern-table thead th:nth-child(1), .modern-table thead th:nth-child(2),
 .bulletin-table thead th:nth-child(1), .bulletin-table thead th:nth-child(2) { 
   z-index: 15; background-color: #2c3e50; 
 }
 
-/* ==========================================
-   3. 狀態與互動樣式 (新增 AI 相關)
-   ========================================== */
+/* 狀態樣式 */
 .warning-row { background-color: #fff9db !important; }
 .warning-text, .warning-label { color: #d97706; font-size: 0.8em; font-weight: bold; display: block; }
-
-/* 待定狀態與危險提示 */
 .select-danger { background-color: #ffebee !important; color: #c62828 !important; font-weight: bold; border-color: #ef5350 !important; }
 
-/* 🌟 聚會類別專屬樣式 (顯眼藍色) */
-.sermon-type { 
-  color: #0d6efd !important; 
-  font-weight: bold !important; 
-  background-color: rgba(13, 110, 253, 0.03) !important;
-  text-align: center;
-}
+/* 🌟 新增：聚會類別標示 */
+.sermon-type { color: #0d6efd !important; font-weight: bold !important; background-color: rgba(13, 110, 253, 0.05) !important; }
 
-/* 🌟 AI 智慧更新時的閃爍動畫 */
-.table-success-flash {
-  animation: flash-green 1.5s ease-out;
-}
-
-@keyframes flash-green {
-  0% { background-color: #d1e7dd; }
-  100% { background-color: transparent; }
-}
-
-/* 按鈕與標籤微調 */
-.leave-badges .badge {
-  font-weight: normal;
-  letter-spacing: 0.5px;
-}
+/* 🌟 新增：AI 更新成功閃爍動畫 */
+.table-success-flash { animation: flash-green 1.5s ease-out; }
+@keyframes flash-green { 0% { background-color: #d1e7dd; } 100% { background-color: transparent; } }
