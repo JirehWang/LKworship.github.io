@@ -2,68 +2,10 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>敬拜團服事排班系統</title>
+  <title>敬拜團服事排班系統 - 管理後台</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  
-  <style>
-    body { background-color: #f4f7f6; font-family: "Microsoft JhengHei", sans-serif; }
-    .container { background-color: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-top: 2rem; margin-bottom: 3rem; }
-    .tab-content { display: none; padding-top: 20px; }
-    .tab-content.active { display: block; }
-    
-    /* ==========================================
-       共通：凍結窗格與自動折行樣式
-       ========================================== */
-    .table-scroll-container { 
-      background: white; 
-      border-radius: 10px; 
-      overflow-x: auto; /* 啟用左右捲動 */
-      border: 1px solid #dee2e6; 
-      position: relative;
-    }
-
-    .modern-table {
-      width: max-content; /* 內容撐開，不壓縮 */
-      min-width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-    }
-
-    .modern-table th { 
-      background-color: #343a40; 
-      color: white; 
-      text-align: center; 
-      padding: 15px 10px; 
-      white-space: nowrap; 
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-
-    .modern-table td { 
-      vertical-align: middle; 
-      text-align: center; 
-      padding: 12px 10px; 
-      border-bottom: 1px solid #eee;
-      max-width: 180px; 
-      white-space: normal !important; 
-      word-break: break-all;
-      line-height: 1.5;
-    }
-
-    .modern-table th:nth-child(1), .modern-table td:nth-child(1) { position: sticky; left: 0; width: 110px; min-width: 110px; max-width: 110px; z-index: 5; background-color: #fff; }
-    .modern-table th:nth-child(2), .modern-table td:nth-child(2) { position: sticky; left: 110px; width: 100px; min-width: 100px; max-width: 100px; z-index: 5; background-color: #fff; box-shadow: 3px 0 5px -2px rgba(0,0,0,0.1); }
-    .modern-table thead th:nth-child(1), .modern-table thead th:nth-child(2) { z-index: 15; background-color: #343a40; }
-    .modern-table tbody tr:hover td { background-color: #f8f9fa; }
-
-    .warning-row { background-color: #fff8e1 !important; }
-    .warning-text { color: #f57c00; font-size: 0.85em; font-weight: bold; margin-top: 4px; display: block; }
-    
-    .modern-table .form-select, .modern-table input[type="text"] { border: 1px solid #ced4da; transition: all 0.2s; min-width: 110px; text-align: center; }
-    .modern-table .form-select:hover { border-color: #0d6efd; }
-    .select-danger { background-color: #ffebee !important; color: #c62828 !important; font-weight: bold; border-color: #ef5350 !important; }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -94,7 +36,7 @@
       </div>
     </div>
     <div class="alert alert-light border border-warning border-opacity-50">
-      💡 若出現 <span class="badge bg-warning text-dark">⚠️ 警告</span> 標記，代表該日排班有違規情況（如連任或同一天重複排班）。
+      💡 若出現 <span class="badge bg-warning text-dark">⚠️ 警告</span> 標記，代表該日排班有違規情況。
     </div>
     <div class="table-scroll-container" id="dashboardContainer">
       <div class="text-center text-muted p-5">請選擇季度以載入資料...</div>
@@ -109,13 +51,7 @@
     <div class="table-responsive">
       <table class="table table-bordered align-middle table-hover">
         <thead class="table-light text-center">
-          <tr>
-            <th style="width: 50px;">↕️</th> 
-            <th style="width: 20%;">位置名稱</th>
-            <th style="width: 50%;">人員名單 (逗號分隔)</th>
-            <th style="width: 15%;">是否必排</th>
-            <th style="width: 80px;">操作</th>
-          </tr>
+          <tr><th style="width: 50px;">↕️</th><th style="width: 20%;">位置名稱</th><th style="width: 50%;">人員名單</th><th style="width: 15%;">是否必排</th><th style="width: 80px;">操作</th></tr>
         </thead>
         <tbody id="positionsTbody"></tbody>
       </table>
@@ -130,11 +66,9 @@
           <label class="fw-bold text-primary mb-2">1. 產生全新排班</label>
           <input type="text" id="multiDatePicker" class="form-control mb-2 bg-white" placeholder="點此打開日曆多選...">
           <button class="btn btn-sm btn-primary w-100 fw-bold" onclick="addSelectedDates()">確認新增日期</button>
-          
           <div id="dateSettingsContainer" class="mt-3" style="max-height: 350px; overflow-y: auto;"></div>
           <button class="btn btn-danger w-100 mt-3 fw-bold" onclick="generateSchedule()">產生排班預覽 🚀</button>
         </div>
-        
         <div class="card p-3 border-0 bg-success bg-opacity-10 shadow-sm">
           <label class="fw-bold text-success mb-2">2. 讀取現有排班</label>
           <input type="date" id="editStartDate" class="form-control form-control-sm mb-1">
@@ -142,20 +76,14 @@
           <button class="btn btn-sm btn-success w-100 fw-bold" onclick="loadExistingSchedule()">讀取資料 📥</button>
         </div>
       </div>
-
       <div class="col-md-9">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold text-primary mb-0">排班預覽編輯 (支援下拉選單與同日防呆)</h5>
+          <h5 class="fw-bold text-primary mb-0">排班預覽編輯</h5>
           <button class="btn btn-success fw-bold px-4 shadow-sm" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存並發佈</button>
         </div>
-        
         <div class="table-scroll-container" id="previewContainer" style="display: none;">
-          <table class="modern-table">
-            <thead id="previewThead"></thead>
-            <tbody id="previewTbody"></tbody>
-          </table>
+          <table class="modern-table"><thead id="previewThead"></thead><tbody id="previewTbody"></tbody></table>
         </div>
-        
         <div id="previewPlaceholder" class="text-center text-muted mt-4 p-5 bg-light rounded-3 border">
           <h5 class="text-secondary">請先在左側設定條件並產生預覽</h5>
         </div>
@@ -168,27 +96,11 @@
       <h5 class="fw-bold">📖 牧師、題目與經文快速登錄</h5>
       <button class="btn btn-success fw-bold px-4" onclick="saveSermonData()">儲存至資料庫</button>
     </div>
-
-    <div class="alert alert-info shadow-sm border-0">
-      💡 <strong>快速匯入秘訣：</strong>在 Excel 複製 <strong>[日期, 牧師, 題目, 經文]</strong>，點擊下方輸入框按下 <code>Ctrl + V</code> 貼上，系統會自動轉換。若日期相同，會<strong>自動覆蓋舊資料</strong>！
-    </div>
-
-    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light shadow-sm" rows="2" 
-      placeholder="📋 點擊這裡，然後貼上 Excel 資料..." onpaste="handleSermonPaste(event)"></textarea>
-
+    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light shadow-sm" rows="2" placeholder="📋 貼上 Excel 資料..." onpaste="handleSermonPaste(event)"></textarea>
     <div class="table-responsive bg-white rounded-3 shadow-sm border mb-3">
       <table class="table table-hover mb-0 align-middle">
-        <thead class="table-dark text-center">
-          <tr>
-            <th style="width: 15%">日期</th>
-            <th style="width: 15%">牧師</th>
-            <th style="width: 35%">題目</th>
-            <th style="width: 30%">經文</th>
-            <th style="width: 5%">操作</th>
-          </tr>
-        </thead>
-        <tbody id="sermonTbody">
-          </tbody>
+        <thead class="table-dark text-center"><tr><th>日期</th><th>牧師</th><th>題目</th><th>經文</th><th>操作</th></tr></thead>
+        <tbody id="sermonTbody"></tbody>
       </table>
     </div>
     <button class="btn btn-outline-secondary w-100 fw-bold" onclick="addSermonRow('', '', '', '')">+ 手動新增一列</button>
@@ -200,10 +112,9 @@
     <div class="modal-content">
       <div class="modal-header bg-light">
         <h5 class="modal-title fw-bold">選擇請假人員 <span id="leaveModalDate" class="text-primary ms-2 fs-6"></span></h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" id="leaveModalBody">
-        </div>
+      <div class="modal-body" id="leaveModalBody"></div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
         <button type="button" class="btn btn-primary fw-bold" onclick="confirmLeaveSelection()">確認儲存</button>
@@ -216,556 +127,6 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/zh.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script> 
-<script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
-
-  function switchTab(tabId) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    document.querySelector(`a[onclick="switchTab('${tabId}')"]`).classList.add('active');
-    
-    if(tabId === 'dashboard') loadDashboard();
-    if(tabId === 'settings') loadPositions();
-    if(tabId === 'schedule') initScheduleTab();
-    if(tabId === 'sermon') loadSermonData();
-  }
-
-  window.onload = () => {
-    document.getElementById('syncTime').innerText = new Date().toLocaleTimeString();
-    loadDashboard();
-  };
-
-  async function callAPI(action, payload) {
-    const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: action, ...payload }) });
-    return await response.json();
-  }
-
-  // ==========================================
-  // 1. 公佈欄邏輯
-  // ==========================================
-  async function loadDashboard() {
-    const container = document.getElementById('dashboardContainer');
-    container.innerHTML = '<div class="text-center p-5 text-primary"><div class="spinner-border"></div><div class="mt-2">正在載入最新班表...</div></div>';
-    const [year, quarter] = document.getElementById('quarterSelect').value.split('-');
-
-    try {
-      const result = await callAPI('getSchedule', { year, quarter });
-      if (result.status === 'success') {
-        document.getElementById('syncTime').innerText = new Date().toLocaleTimeString();
-        renderDashboardTable(result.data);
-      } else {
-        container.innerHTML = `<div class="alert alert-danger m-3">載入失敗：${result.message}</div>`;
-      }
-    } catch (error) {
-      container.innerHTML = `<div class="alert alert-danger m-3">網路連線錯誤！</div>`;
-    }
-  }
-
-  function renderDashboardTable(data) {
-    const container = document.getElementById('dashboardContainer');
-    if (!data || data.length === 0) {
-      container.innerHTML = '<div class="alert alert-warning text-center m-4">該季度目前沒有排班資料。</div>';
-      return;
-    }
-
-    const fixedHeaders = ['日期', '聚會類別', '牧師', '題目', '經文'];
-    const allKeys = Object.keys(data[0]);
-    const dynamicHeaders = allKeys.filter(k => !fixedHeaders.includes(k) && !['hasWarning', 'warningMessage', '年度', '季度'].includes(k));
-    const finalHeaders = [...fixedHeaders, ...dynamicHeaders];
-
-    let html = `<table class="modern-table"><thead><tr>`;
-    finalHeaders.forEach(h => html += `<th>${h}</th>`);
-    html += `</tr></thead><tbody>`;
-
-    data.forEach(row => {
-      html += `<tr class="${row.hasWarning ? 'warning-row' : ''}">`;
-      
-      finalHeaders.forEach(h => {
-        let val = row[h] || '';
-        
-        if (h === '日期') {
-          html += `<td><strong>${val}</strong>`;
-          if (row.hasWarning) {
-            html += `<span class="warning-text">⚠️ ${row.warningMessage}</span>`;
-          }
-          html += `</td>`;
-        } else {
-          let extraClass = (val === '【待定】') ? 'text-danger fw-bold' : '';
-          let displayVal = (val === '') ? '<span class="text-black-50">-</span>' : val;
-          html += `<td class="${extraClass}">${displayVal}</td>`;
-        }
-      });
-      html += `</tr>`;
-    });
-    html += `</tbody></table>`;
-    container.innerHTML = html;
-  }
-
-  // ==========================================
-  // 2. 位置設定邏輯
-  // ==========================================
-  let sortablePositions = null; 
-
-  async function loadPositions() {
-    const tbody = document.getElementById('positionsTbody');
-    const result = await callAPI('getPositions', {});
-    tbody.innerHTML = ''; 
-    if (result.status === 'success') {
-      if(result.data.length === 0) addPositionRow('主領', '', '是');
-      else result.data.forEach(item => addPositionRow(item.positionName, item.personnel, item.isRequired || '是'));
-      
-      if (sortablePositions) sortablePositions.destroy();
-      sortablePositions = new Sortable(tbody, { handle: '.drag-handle', animation: 150, ghostClass: 'bg-light' });
-    }
-  }
-
-  function addPositionRow(posName, personnel, isRequired = "是") {
-    const tbody = document.getElementById('positionsTbody');
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="text-center align-middle drag-handle" style="cursor: grab; font-size: 1.2em; color: #adb5bd;">☰</td>
-      <td><input type="text" class="form-control form-control-sm pos-name text-center" value="${posName}"></td>
-      <td><input type="text" class="form-control form-control-sm pos-personnel" value="${personnel}" placeholder="如：張三,李四"></td>
-      <td>
-        <select class="form-select form-select-sm pos-required text-center">
-          <option value="是" ${isRequired === "是" ? "selected" : ""}>必排</option>
-          <option value="否" ${isRequired === "否" ? "selected" : ""}>非必排</option>
-        </select>
-      </td>
-      <td class="text-center align-middle"><button class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">刪除</button></td>
-    `;
-    tbody.appendChild(tr);
-  }
-
-  async function savePositionsToServer() {
-    const rows = document.querySelectorAll('#positionsTbody tr');
-    let positionsData = [];
-    rows.forEach(tr => {
-      const nameInput = tr.querySelector('.pos-name').value.trim();
-      const personnelInput = tr.querySelector('.pos-personnel').value.trim();
-      const reqInput = tr.querySelector('.pos-required').value;
-      if (nameInput !== '') positionsData.push({ positionName: nameInput, personnel: personnelInput, isRequired: reqInput });
-    });
-
-    const saveBtn = event.target;
-    saveBtn.disabled = true; saveBtn.innerText = "儲存中...";
-    await callAPI('savePositions', { positionsData });
-    alert("✅ 設定已成功儲存！");
-    saveBtn.disabled = false; saveBtn.innerText = "儲存設定";
-  }
-
-  // ==========================================
-  // 3. 服事安排 (彈出視窗選取請假)
-  // ==========================================
-  let currentPositions = []; 
-  let generatedScheduleData = []; 
-  let fpInstance = null; 
-  let uniquePersonnel = []; 
-  let currentLeaveCard = null; // 記錄開啟彈窗的卡片
-
-  async function initScheduleTab() {
-    if (!fpInstance) fpInstance = flatpickr("#multiDatePicker", { mode: "multiple", dateFormat: "Y-m-d", locale: "zh" });
-    const result = await callAPI('getPositions', {});
-    if (result.status === 'success') {
-      currentPositions = result.data;
-      
-      let nameSet = new Set();
-      currentPositions.forEach(pos => {
-        if (pos.personnel) {
-          pos.personnel.split(',').forEach(name => {
-            let cleanName = name.trim();
-            if (cleanName !== '') nameSet.add(cleanName);
-          });
-        }
-      });
-      uniquePersonnel = Array.from(nameSet).sort();
-    }
-  }
-
-  function addSelectedDates() {
-    if (!fpInstance || fpInstance.selectedDates.length === 0) { alert("請先點選日期"); return; }
-    const selectedDates = fpInstance.selectedDates.sort((a, b) => a - b);
-    
-    selectedDates.forEach(dateObj => {
-      const dateString = flatpickr.formatDate(dateObj, "Y-m-d");
-      const div = document.createElement('div');
-      div.className = 'card mb-2 p-2 border-primary border-opacity-25 shadow-sm';
-      
-      div.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateString}" required>
-          <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold text-center" value="主日" placeholder="聚會類別">
-          <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.card').remove()">x</button>
-        </div>
-        <button class="btn btn-outline-secondary btn-sm w-100" onclick="openLeaveModal(this)">🔍 點選請假人員...</button>
-        <input type="hidden" class="s-leave" value="">
-        <div class="leave-badges mt-2"></div>
-      `;
-      document.getElementById('dateSettingsContainer').appendChild(div);
-    });
-    fpInstance.clear();
-  }
-
-  // 🌟 打開請假彈出視窗
-  function openLeaveModal(btnElement) {
-    currentLeaveCard = btnElement.closest('.card');
-    const dateVal = currentLeaveCard.querySelector('.s-date').value;
-    document.getElementById('leaveModalDate').innerText = `(${dateVal})`;
-
-    const currentLeaves = currentLeaveCard.querySelector('.s-leave').value.split(',').filter(x => x);
-
-    let html = '<div class="row g-2">';
-    uniquePersonnel.forEach(name => {
-      const isChecked = currentLeaves.includes(name) ? 'checked' : '';
-      html += `
-        <div class="col-6 col-sm-4">
-          <div class="form-check">
-            <input class="form-check-input leave-checkbox" type="checkbox" value="${name}" id="chk_${name}" ${isChecked}>
-            <label class="form-check-label" for="chk_${name}">${name}</label>
-          </div>
-        </div>
-      `;
-    });
-    html += '</div>';
-    
-    document.getElementById('leaveModalBody').innerHTML = html;
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('leaveModal')).show();
-  }
-
-  // 🌟 確認請假人員並更新卡片UI
-  function confirmLeaveSelection() {
-    if (!currentLeaveCard) return;
-
-    const checkedBoxes = document.querySelectorAll('.leave-checkbox:checked');
-    const selectedNames = Array.from(checkedBoxes).map(cb => cb.value);
-
-    currentLeaveCard.querySelector('.s-leave').value = selectedNames.join(',');
-
-    const badgeContainer = currentLeaveCard.querySelector('.leave-badges');
-    if (selectedNames.length > 0) {
-      badgeContainer.innerHTML = selectedNames.map(name => `<span class="badge bg-secondary me-1 mb-1 shadow-sm">${name}</span>`).join('');
-    } else {
-      badgeContainer.innerHTML = '';
-    }
-
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('leaveModal')).hide();
-  }
-
-  function getQuarter(dateString) {
-    return `Q${Math.floor((new Date(dateString).getMonth() + 3) / 3)}`;
-  }
-
-  function generateSchedule() {
-    if (currentPositions.length === 0) { alert("請先至設定頁建立位置資料！"); return; }
-    const rows = document.querySelectorAll('#dateSettingsContainer .card');
-    let inputConditions = [];
-    
-    rows.forEach(row => {
-      const dateVal = row.querySelector('.s-date').value;
-      if (dateVal) {
-        inputConditions.push({
-          date: dateVal, 
-          type: row.querySelector('.s-type').value.trim(),
-          leaves: row.querySelector('.s-leave').value.split(',').map(s=>s.trim()).filter(s=>s) 
-        });
-      }
-    });
-
-    if (inputConditions.length === 0) { alert("請設定至少一天日期！"); return; }
-    inputConditions.sort((a, b) => a.date.localeCompare(b.date));
-
-    let leaderObj = currentPositions.find(p => p.positionName === '主領');
-    let leaderMasterList = leaderObj ? leaderObj.personnel.split(',').map(s=>s.trim()).filter(s=>s) : [];
-    let leaderPool = []; 
-    let consecutiveCount = {}; 
-    currentPositions.forEach(p => { consecutiveCount[p.positionName] = {}; });
-    
-    let previousLeader = null; 
-    generatedScheduleData = [];
-
-    inputConditions.forEach(dayInfo => {
-      let dailyRecord = { '年度': dayInfo.date.substring(0,4), '季度': getQuarter(dayInfo.date), '日期': dayInfo.date, '聚會類別': dayInfo.type };
-      let assignedToday = []; 
-
-      currentPositions.forEach(posObj => {
-        let posName = posObj.positionName;
-        let candidates = posObj.personnel.split(',').map(s=>s.trim()).filter(s=>s);
-        let isReq = posObj.isRequired || '是';
-        let selectedPerson = "";
-
-        if (posName === '主領') {
-          if (leaderPool.length === 0) leaderPool = [...leaderMasterList];
-          let validLeaders = leaderPool.filter(p => !dayInfo.leaves.includes(p) && p !== previousLeader);
-          if (validLeaders.length > 0) {
-            selectedPerson = validLeaders[Math.floor(Math.random() * validLeaders.length)];
-            leaderPool = leaderPool.filter(p => p !== selectedPerson); 
-          }
-        } else {
-          let validCandidates = candidates.filter(p => !dayInfo.leaves.includes(p) && !assignedToday.includes(p) && (consecutiveCount[posName][p]||0)<2);
-          if (validCandidates.length > 0) selectedPerson = validCandidates[Math.floor(Math.random() * validCandidates.length)];
-        }
-
-        if (selectedPerson === "" && isReq === "是") selectedPerson = "【待定】"; 
-        
-        dailyRecord[posName] = selectedPerson;
-        if (selectedPerson && selectedPerson !== "【待定】") assignedToday.push(selectedPerson);
-
-        candidates.forEach(person => {
-          if (person === selectedPerson) consecutiveCount[posName][person] = (consecutiveCount[posName][person] || 0) + 1;
-          else consecutiveCount[posName][person] = 0;
-        });
-      }); 
-      previousLeader = dailyRecord['主領'];
-      generatedScheduleData.push(dailyRecord);
-    }); 
-    renderPreviewTable(generatedScheduleData);
-  }
-
-  async function loadExistingSchedule() {
-    const startDate = document.getElementById('editStartDate').value;
-    const endDate = document.getElementById('editEndDate').value;
-    if (!startDate || !endDate) { alert("請選擇日期區間！"); return; }
-    
-    const btn = event.target;
-    btn.disabled = true; btn.innerText = "讀取中...";
-
-    const result = await callAPI('getScheduleByDateRange', { startDate, endDate });
-    if (result.status === 'success') {
-      if (result.data.length === 0) alert("區間內無排班資料。");
-      else {
-        generatedScheduleData = result.data; 
-        renderPreviewTable(generatedScheduleData);
-        alert(`✅ 讀取了 ${result.data.length} 天的排班資料！\n請在右側修改後點擊「儲存並發佈」。`);
-      }
-    } else alert("讀取失敗：" + result.message);
-    
-    btn.disabled = false; btn.innerText = "讀取資料 📥";
-  }
-
-  // --- HTML 預覽表格與下拉選單渲染 ---
-  function renderPreviewTable(data) {
-    const container = document.getElementById('previewContainer');
-    const thead = document.getElementById('previewThead');
-    const tbody = document.getElementById('previewTbody');
-    
-    thead.innerHTML = ''; tbody.innerHTML = '';
-
-    let headers = ['日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
-    let trHead = document.createElement('tr');
-    headers.forEach(h => { let th = document.createElement('th'); th.innerText = h; trHead.appendChild(th); });
-    thead.appendChild(trHead);
-
-    data.forEach((row, rowIndex) => {
-      let tr = document.createElement('tr');
-      
-      headers.forEach(h => {
-        let td = document.createElement('td');
-        
-        if (h === '日期') {
-          td.innerHTML = `<span class="badge bg-secondary fs-6 shadow-sm">${row[h]}</span>`;
-        } 
-        else if (h === '聚會類別') {
-          let input = document.createElement('input');
-          input.type = 'text';
-          input.className = 'form-control form-control-sm text-center border-0 bg-transparent fw-bold text-primary';
-          input.value = row[h] || '';
-          input.onchange = (e) => { generatedScheduleData[rowIndex][h] = e.target.value.trim(); };
-          td.appendChild(input);
-        } 
-        else {
-          let posDef = currentPositions.find(p => p.positionName === h);
-          let candidates = posDef ? posDef.personnel.split(',').map(s=>s.trim()).filter(s=>s) : [];
-          let isReq = posDef ? (posDef.isRequired || '是') : '是';
-
-          let select = document.createElement('select');
-          select.className = 'form-select form-select-sm text-center bg-transparent border-0';
-          
-          if(row[h] === '【待定】') select.classList.add('select-danger');
-
-          let optDefault = document.createElement('option');
-          optDefault.value = (isReq === '是') ? '【待定】' : '';
-          optDefault.text = (isReq === '是') ? '【待定】' : '無';
-          select.appendChild(optDefault);
-
-          candidates.forEach(c => {
-            let opt = document.createElement('option');
-            opt.value = c; opt.text = c;
-            if(row[h] === c) opt.selected = true;
-            select.appendChild(opt);
-          });
-
-          let previousValue = row[h] || (isReq === '是' ? '【待定】' : '');
-
-          select.onchange = function() {
-            let newValue = this.value;
-
-            if (newValue !== '' && newValue !== '【待定】') {
-              let duplicateRoles = [];
-              let dayData = generatedScheduleData[rowIndex];
-              
-              currentPositions.forEach(pos => {
-                let checkPosName = pos.positionName;
-                if (checkPosName !== h && dayData[checkPosName] === newValue) {
-                  duplicateRoles.push(checkPosName);
-                }
-              });
-
-              if (duplicateRoles.length > 0) {
-                if (!confirm(`⚠️ 警告：\n[${newValue}] 在這天已被安排【${duplicateRoles.join('、')}】。\n\n確定讓他同時擔任【${h}】嗎？`)) {
-                  this.value = previousValue;
-                  if (previousValue === '【待定】') this.classList.add('select-danger');
-                  else this.classList.remove('select-danger');
-                  return; 
-                }
-              }
-            }
-
-            generatedScheduleData[rowIndex][h] = newValue;
-            previousValue = newValue; 
-            
-            if (newValue === '【待定】') this.classList.add('select-danger');
-            else this.classList.remove('select-danger');
-          };
-          td.appendChild(select);
-        }
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('previewPlaceholder').style.display = 'none';
-    container.style.display = 'block';
-    document.getElementById('saveScheduleBtn').style.display = 'inline-block';
-  }
-
-  async function saveGeneratedSchedule() {
-    if (generatedScheduleData.length === 0) return;
-    const btn = document.getElementById('saveScheduleBtn');
-    btn.disabled = true; btn.innerText = '儲存中...';
-
-    try {
-      const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
-      if (result.status === 'success') {
-        alert("🎉 排班表已成功發佈！");
-        switchTab('dashboard'); 
-      } else alert("儲存失敗：" + result.message);
-    } catch (error) {
-      alert("網路連線錯誤！");
-    } finally {
-      btn.disabled = false; btn.innerText = '儲存並發佈';
-    }
-  }
-
-  // ==========================================
-  // 4. 牧師設定邏輯
-  // ==========================================
-  async function loadSermonData() {
-    const tbody = document.getElementById('sermonTbody');
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted p-4"><div class="spinner-border text-primary"></div></td></tr>';
-    
-    try {
-      const result = await callAPI('getSermonInfo', {});
-      tbody.innerHTML = '';
-      if (result.status === 'success' && result.data.length > 0) {
-        result.data.forEach(row => {
-          addSermonRow(row['日期'] || '', row['牧師'] || '', row['題目'] || '', row['經文'] || '');
-        });
-      } else {
-        addSermonRow('', '', '', ''); 
-      }
-    } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger p-4">載入失敗，請檢查網路</td></tr>';
-    }
-  }
-
-  function addSermonRow(date, pastor, title, scripture) {
-    const tbody = document.getElementById('sermonTbody');
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="date" class="form-control form-control-sm sermon-date" value="${date}"></td>
-      <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}" placeholder="姓名"></td>
-      <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}" placeholder="題目"></td>
-      <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}" placeholder="章節"></td>
-      <td class="text-center align-middle"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">刪除</button></td>
-    `;
-    tbody.appendChild(tr);
-  }
-
-  function handleSermonPaste(e) {
-    e.preventDefault(); 
-    let pasteData = (e.clipboardData || window.clipboardData).getData('text');
-    if (!pasteData) return;
-
-    let rows = pasteData.split(/\r?\n/);
-    rows.forEach(rowStr => {
-      if (rowStr.trim() === '') return;
-      let cols = rowStr.split('\t');
-      if (cols[0] && cols[0].includes('日期')) return;
-
-      let date = cols[0] ? cols[0].trim().replace(/\//g, '-') : '';
-      let pastor = cols[1] ? cols[1].trim() : '';
-      let title = cols[2] ? cols[2].trim() : '';
-      let scripture = cols[3] ? cols[3].trim() : '';
-
-      if (!date) return;
-
-      const existingRows = document.querySelectorAll('#sermonTbody tr');
-      let foundExisting = false;
-
-      for (let tr of existingRows) {
-        let dateInput = tr.querySelector('.sermon-date');
-        if (dateInput && dateInput.value === date) {
-          tr.querySelector('.sermon-pastor').value = pastor;
-          tr.querySelector('.sermon-title').value = title;
-          tr.querySelector('.sermon-scripture').value = scripture;
-          tr.style.transition = 'background-color 0.5s';
-          tr.style.backgroundColor = '#fff3cd';
-          setTimeout(() => { tr.style.backgroundColor = ''; }, 1000);
-          foundExisting = true;
-          break;
-        }
-      }
-
-      if (!foundExisting) addSermonRow(date, pastor, title, scripture);
-    });
-    
-    e.target.value = '';
-    document.getElementById('sermonTbody').lastElementChild.scrollIntoView({ behavior: 'smooth' });
-  }
-  
-  async function saveSermonData() {
-    const rows = document.querySelectorAll('#sermonTbody tr');
-    let finalSermonData = [];
-
-    rows.forEach(tr => {
-      let date = tr.querySelector('.sermon-date').value;
-      let pastor = tr.querySelector('.sermon-pastor').value.trim();
-      let title = tr.querySelector('.sermon-title').value.trim();
-      let scripture = tr.querySelector('.sermon-scripture').value.trim();
-
-      if (date !== '') {
-        finalSermonData.push({ '日期': date, '牧師': pastor, '題目': title, '經文': scripture });
-      }
-    });
-
-    if (finalSermonData.length === 0) { alert("請至少填寫一個有效日期的資料"); return; }
-
-    const btn = event.target;
-    btn.disabled = true; btn.innerText = '儲存中...';
-
-    try {
-      const result = await callAPI('saveSermonInfo', { sermonData: finalSermonData });
-      if (result.status === 'success') { 
-        alert("✅ 講員資訊儲存成功！"); 
-        switchTab('dashboard'); 
-      } else alert("儲存失敗：" + result.message);
-    } catch (e) { 
-      alert("網路連線錯誤"); 
-    } finally {
-      btn.disabled = false; btn.innerText = '儲存至資料庫';
-    }
-  }
-</script>
+<script src="script.js"></script>
 </body>
 </html>
