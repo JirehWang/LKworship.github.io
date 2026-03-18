@@ -1,0 +1,33 @@
+/* style.css */
+body { background-color: #f4f7f6; font-family: "Microsoft JhengHei", sans-serif; }
+.container { background-color: #fff; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-top: 2rem; margin-bottom: 3rem; }
+.tab-content { display: none; padding-top: 20px; }
+.tab-content.active { display: block; }
+
+/* 共通：凍結窗格與自動折行樣式 */
+.table-scroll-container { 
+  background: white; border-radius: 10px; overflow-x: auto; border: 1px solid #dee2e6; position: relative;
+}
+.modern-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; }
+.modern-table th { 
+  background-color: #343a40; color: white; text-align: center; padding: 15px 10px; 
+  white-space: nowrap; position: sticky; top: 0; z-index: 10;
+}
+.modern-table td { 
+  vertical-align: middle; text-align: center; padding: 12px 10px; border-bottom: 1px solid #eee;
+  max-width: 180px; white-space: normal !important; word-break: break-all; line-height: 1.5;
+}
+
+/* 凍結第一欄：日期 */
+.modern-table th:nth-child(1), .modern-table td:nth-child(1) { position: sticky; left: 0; width: 110px; min-width: 110px; z-index: 5; background-color: #fff; }
+/* 凍結第二欄：聚會類別 */
+.modern-table th:nth-child(2), .modern-table td:nth-child(2) { position: sticky; left: 110px; width: 100px; min-width: 100px; z-index: 5; background-color: #fff; box-shadow: 3px 0 5px -2px rgba(0,0,0,0.1); }
+.modern-table thead th:nth-child(1), .modern-table thead th:nth-child(2) { z-index: 15; background-color: #343a40; }
+.modern-table tbody tr:hover td { background-color: #f8f9fa; }
+
+.warning-row { background-color: #fff8e1 !important; }
+.warning-text { color: #f57c00; font-size: 0.85em; font-weight: bold; margin-top: 4px; display: block; }
+
+.modern-table .form-select, .modern-table input[type="text"] { border: 1px solid #ced4da; transition: all 0.2s; min-width: 110px; text-align: center; }
+.modern-table .form-select:hover { border-color: #0d6efd; }
+.select-danger { background-color: #ffebee !important; color: #c62828 !important; font-weight: bold; border-color: #ef5350 !important; }
