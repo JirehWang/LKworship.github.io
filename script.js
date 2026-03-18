@@ -274,9 +274,42 @@ function renderPreviewTable(data) {
   document.getElementById('saveScheduleBtn').style.display = 'inline-block';
 }
 
+async function saveGeneratedSchedule() {
+  const btn = document.getElementById('saveScheduleBtn'); btn.disabled = true;
+  const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
+  if (result.status === 'success') { alert("🎉 排班表發佈成功！"); switchTab('dashboard'); }
+  btn.disabled = false;
+}
+
 // ==========================================
-// 4. 牧師登錄 (AI 智慧功能)
+// 4. 牧師登錄 (保留 Excel 貼上 + AI 智慧功能)
 // ==========================================
+
+/**
+ * 🌟 核心：處理 Excel 直接貼上
+ */
+function handleSermonPaste(e) {
+  let pasteData = (e.clipboardData || window.clipboardData).getData('text');
+  
+  // 如果內容含有 Tab 鍵，表示是從 Excel 或 Google Sheets 複製來的
+  if (pasteData.includes('\t')) {
+    e.preventDefault(); // 攔截預設的貼上動作
+    pasteData.split(/\r?\n/).forEach(rowStr => {
+      let cols = rowStr.split('\t'); 
+      if (!cols[0] || cols[0].includes('日期')) return; // 跳過標題行或空行
+      
+      let d = cols[0].trim().replace(/\//g, '-');
+      // 支援 4 欄或 5 欄的 Excel 格式
+      if (cols.length >= 5) {
+        addSermonRow(d, cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim(), cols[4]?.trim());
+      } else {
+        addSermonRow(d, '主日', cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim());
+      }
+    });
+    e.target.value = ""; // 清空框框
+  }
+  // 如果沒有 Tab 鍵（例如一般的 Line 訊息），就會順利貼進框框讓 AI 處理
+}
 
 /**
  * 🌟 核心：AI 智慧解析
@@ -339,11 +372,4 @@ async function saveSermonData() {
   btn.disabled = true;
   await callAPI('saveSermonInfo', { sermonData: data });
   alert("✅ 講員資訊已儲存！"); btn.disabled = false; switchTab('dashboard');
-}
-
-async function saveGeneratedSchedule() {
-  const btn = document.getElementById('saveScheduleBtn'); btn.disabled = true;
-  const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
-  if (result.status === 'success') { alert("🎉 排班表發佈成功！"); switchTab('dashboard'); }
-  btn.disabled = false;
 }
