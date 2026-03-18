@@ -8,12 +8,35 @@ let fpInstance = null;
 let uniquePersonnel = []; 
 let currentLeaveCard = null; 
 let sortablePositions = null; 
+let currentAbortController = null; // 🌟 新增：用於控制 fetch 中斷
+
+// --- 初始化 ---
+window.onload = () => {
+  const syncTimeEl = document.getElementById('syncTime');
+  if (syncTimeEl) {
+    syncTimeEl.innerText = new Date().toLocaleTimeString();
+  }
+  loadDashboard();
+};
+
+// --- 通用 API 呼叫 ---
+async function callAPI(action, payload) {
+  const response = await fetch(API_URL, { 
+    method: 'POST', 
+    body: JSON.stringify({ action: action, ...payload }) 
+  });
+  return await response.json();
+}
 
 // --- 頁籤切換邏輯 ---
 function switchTab(tabId) {
+  const content = document.getElementById(tabId);
+  if (!content) return;
+
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
-  document.getElementById(tabId).classList.add('active');
+  
+  content.classList.add('active');
   const activeLink = document.querySelector(`a[onclick="switchTab('${tabId}')"]`);
   if (activeLink) activeLink.classList.add('active');
   
@@ -23,33 +46,50 @@ function switchTab(tabId) {
   if(tabId === 'sermon') loadSermonData();
 }
 
-window.onload = () => {
-  document.getElementById('syncTime').innerText = new Date().toLocaleTimeString();
-  loadDashboard();
-};
-
-async function callAPI(action, payload) {
-  const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: action, ...payload }) });
-  return await response.json();
-}
-
 // ==========================================
-// 1. 公佈欄邏輯
+// 1. 公佈欄邏輯 (支援中斷與多頁面)
 // ==========================================
 async function loadDashboard() {
   const container = document.getElementById('dashboardContainer');
-  container.innerHTML = '<div class="text-center p-5 text-primary"><div class="spinner-border"></div><div class="mt-2">正在載入最新班表...</div></div>';
-  const [year, quarter] = document.getElementById('quarterSelect').value.split('-');
+  const quarterSelect = document.getElementById('quarterSelect');
+  if (!container || !quarterSelect) return;
+
+  const [year, quarter] = quarterSelect.value.split('-');
+  
+  // 顯示載入動畫並清空舊資料
+  container.innerHTML = `
+    <div class="text-center p-5 text-primary">
+      <div class="spinner-border"></div>
+      <div class="mt-2">正在載入 ${year}-${quarter} 最新班表...</div>
+    </div>
+  `;
+
+  // 🌟 處理連鎖請求：中斷上一個尚未完成的請求
+  if (currentAbortController) currentAbortController.abort();
+  currentAbortController = new AbortController();
+  const signal = currentAbortController.signal;
+
   try {
-    const result = await callAPI('getSchedule', { year, quarter });
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'getSchedule', year: year, quarter: quarter }),
+      signal: signal
+    });
+    
+    const result = await response.json();
     if (result.status === 'success') {
-      document.getElementById('syncTime').innerText = new Date().toLocaleTimeString();
+      const syncTimeEl = document.getElementById('syncTime');
+      if (syncTimeEl) syncTimeEl.innerText = new Date().toLocaleTimeString();
       renderDashboardTable(result.data);
     } else {
       container.innerHTML = `<div class="alert alert-danger m-3">載入失敗：${result.message}</div>`;
     }
   } catch (error) {
-    container.innerHTML = `<div class="alert alert-danger m-3">網路連線錯誤！</div>`;
+    if (error.name === 'AbortError') {
+      console.log('已捨棄舊的季度請求');
+    } else {
+      container.innerHTML = `<div class="alert alert-danger m-3">網路連線錯誤！</div>`;
+    }
   }
 }
 
@@ -67,6 +107,7 @@ function renderDashboardTable(data) {
   let html = `<table class="modern-table"><thead><tr>`;
   finalHeaders.forEach(h => html += `<th>${h}</th>`);
   html += `</tr></thead><tbody>`;
+  
   data.forEach(row => {
     html += `<tr class="${row.hasWarning ? 'warning-row' : ''}">`;
     finalHeaders.forEach(h => {
@@ -89,6 +130,7 @@ function renderDashboardTable(data) {
 // ==========================================
 async function loadPositions() {
   const tbody = document.getElementById('positionsTbody');
+  if (!tbody) return;
   const result = await callAPI('getPositions', {});
   tbody.innerHTML = ''; 
   if (result.status === 'success') {
@@ -121,11 +163,14 @@ async function savePositionsToServer() {
     const reqInput = tr.querySelector('.pos-required').value;
     if (nameInput !== '') positionsData.push({ positionName: nameInput, personnel: personnelInput, isRequired: reqInput });
   });
-  const saveBtn = event.target;
-  saveBtn.disabled = true; saveBtn.innerText = "儲存中...";
+
+  const btn = document.querySelector('button[onclick="savePositionsToServer()"]');
+  if (btn) { btn.disabled = true; btn.innerText = "儲存中..."; }
+  
   await callAPI('savePositions', { positionsData });
   alert("✅ 設定已成功儲存！");
-  saveBtn.disabled = false; saveBtn.innerText = "儲存設定";
+  
+  if (btn) { btn.disabled = false; btn.innerText = "儲存設定"; }
 }
 
 // ==========================================
@@ -254,6 +299,7 @@ function renderPreviewTable(data) {
   const container = document.getElementById('previewContainer');
   const thead = document.getElementById('previewThead');
   const tbody = document.getElementById('previewTbody');
+  if (!thead || !tbody) return;
   thead.innerHTML = ''; tbody.innerHTML = '';
   let headers = ['日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
   let trHead = document.createElement('tr');
@@ -297,10 +343,11 @@ function renderPreviewTable(data) {
 }
 
 async function saveGeneratedSchedule() {
-  const btn = document.getElementById('saveScheduleBtn'); btn.disabled = true;
+  const btn = document.getElementById('saveScheduleBtn'); 
+  if (btn) btn.disabled = true;
   const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
   if (result.status === 'success') { alert("🎉 排班表發佈成功！"); switchTab('dashboard'); }
-  btn.disabled = false;
+  if (btn) btn.disabled = false;
 }
 
 // ==========================================
@@ -308,6 +355,7 @@ async function saveGeneratedSchedule() {
 // ==========================================
 async function loadSermonData() {
   const tbody = document.getElementById('sermonTbody');
+  if (!tbody) return;
   const result = await callAPI('getSermonInfo', {});
   tbody.innerHTML = '';
   if (result.status === 'success' && result.data.length > 0) result.data.forEach(row => addSermonRow(row['日期'], row['牧師'], row['題目'], row['經文']));
@@ -342,6 +390,9 @@ async function saveSermonData() {
     let date = tr.querySelector('.sermon-date').value;
     if (date) finalSermonData.push({ '日期': date, '牧師': tr.querySelector('.sermon-pastor').value.trim(), '題目': tr.querySelector('.sermon-title').value.trim(), '經文': tr.querySelector('.sermon-scripture').value.trim() });
   });
+  const btn = document.querySelector('button[onclick="saveSermonData()"]');
+  if (btn) { btn.disabled = true; btn.innerText = "儲存中..."; }
   await callAPI('saveSermonInfo', { sermonData: finalSermonData });
   alert("✅ 講員資訊儲存成功！"); switchTab('dashboard');
+  if (btn) { btn.disabled = false; btn.innerText = "儲存至資料庫"; }
 }
