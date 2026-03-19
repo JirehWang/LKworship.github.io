@@ -162,8 +162,14 @@ async function savePositionsToServer() {
 // 3. 服事安排 (三大核心功能)
 // ==========================================
 
+// ==========================================
+// 3. 服事安排 (三大核心功能)
+// ==========================================
+
+// 初始化：保持清爽，不主動連動公佈欄資料
 async function initScheduleTab() {
   if (!fpInstance) fpInstance = flatpickr("#multiDatePicker", { mode: "multiple", dateFormat: "Y-m-d", locale: "zh" });
+  
   const result = await callAPI('getPositions', {});
   if (result.status === 'success') {
     currentPositions = result.data;
@@ -171,13 +177,16 @@ async function initScheduleTab() {
     currentPositions.forEach(pos => (pos.personnel || '').split(',').forEach(n => n.trim() && nameSet.add(n.trim())));
     uniquePersonnel = Array.from(nameSet).sort();
   }
-  // 初始化時清空預覽
-  document.getElementById('previewContainer').style.display = 'none';
-  document.getElementById('previewPlaceholder').style.display = 'block';
-  document.getElementById('saveScheduleBtn').style.display = 'none';
+  
+  // 🌟 確保切換回來時，若沒有資料則顯示提示
+  if (!generatedScheduleData || generatedScheduleData.length === 0) {
+    document.getElementById('previewContainer').style.display = 'none';
+    document.getElementById('previewPlaceholder').style.display = 'block';
+    document.getElementById('saveScheduleBtn').style.display = 'none';
+  }
 }
 
-// 功能 1：按照之前設定好的規則自動產生新班表
+// 功能 1：【自動產生】按照左側 Step 1 設定之日期與規則產生新班表
 function generateSchedule() {
   const rows = document.querySelectorAll('#dateSettingsContainer .card');
   let inputConditions = [];
@@ -185,7 +194,8 @@ function generateSchedule() {
     const date = row.querySelector('.s-date').value;
     if (date) inputConditions.push({ date, type: row.querySelector('.s-type').value.trim(), leaves: row.querySelector('.s-leave').value.split(',').filter(x => x) });
   });
-  if (!inputConditions.length) return alert("請先從左方選取日期並加入清單");
+  if (!inputConditions.length) return alert("請先從左方選取日期並「確認新增」到清單");
+  
   inputConditions.sort((a, b) => a.date.localeCompare(b.date));
 
   let leaderPool = [], previousLeader = null, consecutive = {};
@@ -217,17 +227,13 @@ function generateSchedule() {
   renderPreviewTable(generatedScheduleData);
 }
 
-// 功能 2：按「季度」查詢已排好的服事表
-// ==========================================
-// 功能 2：按「後台專屬選單」查詢季度班表
-// ==========================================
+// 功能 2：【按季度讀取】按後台專屬選單（editQuarterSelect）讀取整季舊表
 async function loadScheduleByQuarter() {
-  // 🌟 修改點：改讀取 editQuarterSelect 而不是 Dashboard 的選單
-  const select = document.getElementById('editQuarterSelect');
+  const select = document.getElementById('editQuarterSelect'); // 🌟 獨立選單
   const [year, quarter] = select.value.split('-');
 
   const placeholder = document.getElementById('previewPlaceholder');
-  placeholder.innerHTML = `<div class="p-4 text-center text-success"><div class="spinner-border spinner-border-sm"></div> 抓取 ${year} ${quarter} 資料...</div>`;
+  placeholder.innerHTML = `<div class="p-4 text-center text-success"><div class="spinner-border spinner-border-sm"></div> 正在讀取 ${year} ${quarter} 存檔資料...</div>`;
 
   try {
     const result = await callAPI('getSchedule', { year, quarter });
@@ -235,21 +241,19 @@ async function loadScheduleByQuarter() {
       generatedScheduleData = result.data;
       renderPreviewTable(generatedScheduleData);
     } else {
-      placeholder.innerHTML = `<div class="alert alert-warning m-4">資料庫中查無 ${year} ${quarter} 的班表。</div>`;
+      placeholder.innerHTML = `<div class="alert alert-warning m-4">資料庫中查無 ${year} ${quarter} 的班表紀錄。</div>`;
     }
   } catch (error) { alert("讀取季度班表失敗"); }
 }
 
-// ==========================================
-// 功能 3：按「專屬區間日期」進行查詢修改
-// ==========================================
+// 功能 3：【按區間讀取】按 Step 2 設定之專屬起訖日期（queryStartDate/End）讀取舊表
 async function loadScheduleByDateRange() {
   const start = document.getElementById('queryStartDate').value;
   const end = document.getElementById('queryEndDate').value;
 
-  if (!start || !end) return alert("請先設定查詢的起訖日期");
+  if (!start || !end) return alert("請先設定「功能 3」專屬的起訖日期");
 
-  // 生成區間內的所有日期陣列 (後端 getScheduleByDateRange 是接收陣列)
+  // 生成區間內的所有日期陣列
   let dateArray = [];
   let curr = new Date(start);
   let stop = new Date(end);
@@ -259,7 +263,7 @@ async function loadScheduleByDateRange() {
   }
 
   const placeholder = document.getElementById('previewPlaceholder');
-  placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 正在讀取區間資料...</div>';
+  placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 正在根據日期區間撈取資料...</div>';
 
   try {
     const result = await callAPI('getScheduleByDateRange', { dates: dateArray });
@@ -267,10 +271,11 @@ async function loadScheduleByDateRange() {
       generatedScheduleData = result.data;
       renderPreviewTable(generatedScheduleData);
     } else {
-      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間無現有資料。</div>`;
+      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間內無現有排班資料。</div>`;
     }
   } catch (error) { alert("讀取區間班表失敗"); }
 }
+
 // --- 通用預覽與儲存功能 ---
 function renderPreviewTable(data) {
   const thead = document.getElementById('previewThead'), tbody = document.getElementById('previewTbody');
