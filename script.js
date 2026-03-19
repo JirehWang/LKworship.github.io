@@ -1,4 +1,5 @@
-/* script.js */
+/* script.js - 敬拜團服事管理系統 (Pro 終極修正版) */
+
 const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
 // --- 全域變數 ---
@@ -17,7 +18,7 @@ window.onload = () => {
   loadDashboard();
 };
 
-// 🌟 強化版 API 呼叫
+// 🌟 核心 API 呼叫 (帶有連線狀態處理)
 async function callAPI(action, payload) {
   try {
     const response = await fetch(API_URL, { 
@@ -28,8 +29,8 @@ async function callAPI(action, payload) {
     try {
       return JSON.parse(rawText);
     } catch (parseError) {
-      console.error("❌ 後端崩潰！回傳內容：\n", rawText);
-      throw new Error("後端回傳格式異常");
+      console.error("❌ 後端回傳格式異常：\n", rawText);
+      throw new Error("伺服器格式錯誤");
     }
   } catch (networkError) {
     console.error("❌ 網路連線失敗：", networkError);
@@ -54,7 +55,7 @@ function switchTab(tabId) {
 }
 
 // ==========================================
-// 1. 公佈欄邏輯
+// 1. 公佈欄邏輯 (Dashboard)
 // ==========================================
 async function loadDashboard() {
   const container = document.getElementById('dashboardContainer');
@@ -73,16 +74,20 @@ async function loadDashboard() {
       const syncTimeEl = document.getElementById('syncTime');
       if (syncTimeEl) syncTimeEl.innerText = new Date().toLocaleTimeString();
       renderDashboardTable(result.data);
+    } else {
+      container.innerHTML = `<div class="alert alert-warning text-center m-4">⚠️ ${result.message || '查無資料'}</div>`;
     }
   } catch (error) {
-    if (error.name !== 'AbortError') container.innerHTML = `<div class="alert alert-danger">連線錯誤</div>`;
+    if (error.name !== 'AbortError') {
+      container.innerHTML = `<div class="alert alert-danger text-center m-4">❌ 連線錯誤，請確認 API 是否正確佈署</div>`;
+    }
   }
 }
 
 function renderDashboardTable(data) {
   const container = document.getElementById('dashboardContainer');
   if (!data || data.length === 0) {
-    container.innerHTML = '<div class="alert alert-warning text-center m-4">本季度暫無資料。</div>';
+    container.innerHTML = '<div class="alert alert-light text-center m-4">📋 本季度暫無排班資料。</div>';
     return;
   }
   const fixedHeaders = ['日期', '聚會類別', '牧師', '題目', '經文'];
@@ -111,7 +116,7 @@ function renderDashboardTable(data) {
 }
 
 // ==========================================
-// 2. 位置設定邏輯
+// 2. 位置與人員設定 (Settings)
 // ==========================================
 async function loadPositions() {
   const tbody = document.getElementById('positionsTbody');
@@ -121,7 +126,6 @@ async function loadPositions() {
   if (result.status === 'success') {
     result.data.length === 0 ? addPositionRow('主領', '', '是') : result.data.forEach(i => addPositionRow(i.positionName, i.personnel, i.isRequired || '是'));
     if (sortablePositions) sortablePositions.destroy();
-    
     sortablePositions = new Sortable(tbody, { 
         handle: '.drag-handle', 
         animation: 150,
@@ -154,22 +158,16 @@ async function savePositionsToServer() {
   const btn = document.querySelector('button[onclick="savePositionsToServer()"]');
   btn.disabled = true;
   await callAPI('savePositions', { positionsData });
-  alert("✅ 儲存成功！");
+  alert("✅ 位置設定儲存成功！");
   btn.disabled = false;
 }
 
 // ==========================================
-// 3. 服事安排 (三大核心功能)
+// 3. 服事安排 - 三大核心功能 (Schedule)
 // ==========================================
 
-// ==========================================
-// 3. 服事安排 (三大核心功能)
-// ==========================================
-
-// 初始化：保持清爽，不主動連動公佈欄資料
 async function initScheduleTab() {
   if (!fpInstance) fpInstance = flatpickr("#multiDatePicker", { mode: "multiple", dateFormat: "Y-m-d", locale: "zh" });
-  
   const result = await callAPI('getPositions', {});
   if (result.status === 'success') {
     currentPositions = result.data;
@@ -177,16 +175,14 @@ async function initScheduleTab() {
     currentPositions.forEach(pos => (pos.personnel || '').split(',').forEach(n => n.trim() && nameSet.add(n.trim())));
     uniquePersonnel = Array.from(nameSet).sort();
   }
-  
-  // 🌟 確保切換回來時，若沒有資料則顯示提示
-  if (!generatedScheduleData || generatedScheduleData.length === 0) {
+  // 保持預覽區乾淨
+  if (!generatedScheduleData.length) {
     document.getElementById('previewContainer').style.display = 'none';
     document.getElementById('previewPlaceholder').style.display = 'block';
-    document.getElementById('saveScheduleBtn').style.display = 'none';
   }
 }
 
-// 功能 1：【自動產生】按照左側 Step 1 設定之日期與規則產生新班表
+// 功能 1：自動產生新班表
 function generateSchedule() {
   const rows = document.querySelectorAll('#dateSettingsContainer .card');
   let inputConditions = [];
@@ -194,8 +190,7 @@ function generateSchedule() {
     const date = row.querySelector('.s-date').value;
     if (date) inputConditions.push({ date, type: row.querySelector('.s-type').value.trim(), leaves: row.querySelector('.s-leave').value.split(',').filter(x => x) });
   });
-  if (!inputConditions.length) return alert("請先從左方選取日期並「確認新增」到清單");
-  
+  if (!inputConditions.length) return alert("請先從左方 Step 1 選取日期");
   inputConditions.sort((a, b) => a.date.localeCompare(b.date));
 
   let leaderPool = [], previousLeader = null, consecutive = {};
@@ -227,13 +222,12 @@ function generateSchedule() {
   renderPreviewTable(generatedScheduleData);
 }
 
-// 功能 2：【按季度讀取】按後台專屬選單（editQuarterSelect）讀取整季舊表
+// 功能 2：按季度讀取舊表
 async function loadScheduleByQuarter() {
-  const select = document.getElementById('editQuarterSelect'); // 🌟 獨立選單
+  const select = document.getElementById('editQuarterSelect');
   const [year, quarter] = select.value.split('-');
-
   const placeholder = document.getElementById('previewPlaceholder');
-  placeholder.innerHTML = `<div class="p-4 text-center text-success"><div class="spinner-border spinner-border-sm"></div> 正在讀取 ${year} ${quarter} 存檔資料...</div>`;
+  placeholder.innerHTML = `<div class="p-4 text-center text-success"><div class="spinner-border spinner-border-sm"></div> 讀取 ${year} ${quarter} 資料中...</div>`;
 
   try {
     const result = await callAPI('getSchedule', { year, quarter });
@@ -241,29 +235,30 @@ async function loadScheduleByQuarter() {
       generatedScheduleData = result.data;
       renderPreviewTable(generatedScheduleData);
     } else {
-      placeholder.innerHTML = `<div class="alert alert-warning m-4">資料庫中查無 ${year} ${quarter} 的班表紀錄。</div>`;
+      placeholder.innerHTML = `<div class="alert alert-warning m-4">查無 ${year} ${quarter} 存檔紀錄。</div>`;
     }
-  } catch (error) { alert("讀取季度班表失敗"); }
+  } catch (error) { alert("讀取失敗"); }
 }
 
-// 功能 3：【按區間讀取】按 Step 2 設定之專屬起訖日期（queryStartDate/End）讀取舊表
+// 功能 3：按區間日期讀取 (修正時區 Bug)
 async function loadScheduleByDateRange() {
   const start = document.getElementById('queryStartDate').value;
   const end = document.getElementById('queryEndDate').value;
+  if (!start || !end) return alert("請先設定起訖日期");
 
-  if (!start || !end) return alert("請先設定「功能 3」專屬的起訖日期");
-
-  // 生成區間內的所有日期陣列
   let dateArray = [];
   let curr = new Date(start);
   let stop = new Date(end);
   while (curr <= stop) {
-    dateArray.push(new Date(curr).toISOString().split('T')[0]);
+    const y = curr.getFullYear();
+    const m = String(curr.getMonth() + 1).padStart(2, '0');
+    const d = String(curr.getDate()).padStart(2, '0');
+    dateArray.push(`${y}-${m}-${d}`);
     curr.setDate(curr.getDate() + 1);
   }
 
   const placeholder = document.getElementById('previewPlaceholder');
-  placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 正在根據日期區間撈取資料...</div>';
+  placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 撈取區間資料中...</div>';
 
   try {
     const result = await callAPI('getScheduleByDateRange', { dates: dateArray });
@@ -271,17 +266,16 @@ async function loadScheduleByDateRange() {
       generatedScheduleData = result.data;
       renderPreviewTable(generatedScheduleData);
     } else {
-      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間內無現有排班資料。</div>`;
+      placeholder.innerHTML = `<div class="alert alert-info m-4">區間內目前無存檔資料。</div>`;
     }
-  } catch (error) { alert("讀取區間班表失敗"); }
+  } catch (error) { alert("區間讀取失敗"); }
 }
 
-// --- 通用預覽與儲存功能 ---
+// --- 通用預覽渲染 ---
 function renderPreviewTable(data) {
   const thead = document.getElementById('previewThead'), tbody = document.getElementById('previewTbody');
   thead.innerHTML = ''; tbody.innerHTML = '';
-  
-  if (!data || data.length === 0) return;
+  if (!data.length) return;
 
   let headers = ['日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
   let trH = document.createElement('tr');
@@ -307,9 +301,8 @@ function renderPreviewTable(data) {
         if (row[h] === '【待定】') sel.classList.add('select-danger');
         sel.innerHTML = `<option value="${pos?.isRequired==='是'?'【待定】':''}">${pos?.isRequired==='是'?'【待定】':'無'}</option>` + cands.map(c => `<option value="${c}" ${row[h]===c?'selected':''}>${c}</option>`).join('');
         sel.onchange = function() {
-          let val = this.value;
-          generatedScheduleData[idx][h] = val;
-          val === '【待定】' ? this.classList.add('select-danger') : this.classList.remove('select-danger');
+          generatedScheduleData[idx][h] = this.value;
+          this.value === '【待定】' ? this.classList.add('select-danger') : this.classList.remove('select-danger');
         };
         td.appendChild(sel);
       }
@@ -324,28 +317,26 @@ function renderPreviewTable(data) {
 
 async function saveGeneratedSchedule() {
   const btn = document.getElementById('saveScheduleBtn'); 
-  btn.disabled = true;
-  btn.innerText = "儲存中...";
+  btn.disabled = true; btn.innerText = "儲存中...";
   const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
-  if (result.status === 'success') { alert("🎉 排班表發佈成功！"); switchTab('dashboard'); }
-  btn.disabled = false;
-  btn.innerText = "儲存並發佈";
+  if (result.status === 'success') { alert("🎉 排班表已成功存檔！"); loadDashboard(); switchTab('dashboard'); }
+  btn.disabled = false; btn.innerText = "儲存並發佈至雲端";
 }
 
-// --- 其他輔助功能 ---
+// --- 日期與請假輔助 ---
 function addSelectedDates() {
   if (!fpInstance?.selectedDates.length) { alert("請先點選日期"); return; }
   fpInstance.selectedDates.sort((a, b) => a - b).forEach(dateObj => {
-    const dateString = flatpickr.formatDate(dateObj, "Y-m-d");
+    const dStr = dateObj.toLocaleDateString('en-CA');
     const div = document.createElement('div');
     div.className = 'card mb-2 p-2 border-primary border-opacity-25 shadow-sm';
     div.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateString}">
+        <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dStr}">
         <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold text-center" value="主日" onclick="this.select()">
         <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.card').remove()">x</button>
       </div>
-      <button class="btn btn-outline-secondary btn-sm w-100" onclick="openLeaveModal(this)">🔍 點選請假人員...</button>
+      <button class="btn btn-outline-secondary btn-sm w-100" onclick="openLeaveModal(this)">🔍 設定請假人員</button>
       <input type="hidden" class="s-leave" value="">
       <div class="leave-badges mt-2"></div>
     `;
@@ -369,72 +360,16 @@ function openLeaveModal(btn) {
 function confirmLeaveSelection() {
   const selected = Array.from(document.querySelectorAll('.leave-checkbox:checked')).map(cb => cb.value);
   currentLeaveCard.querySelector('.s-leave').value = selected.join(',');
-  currentLeaveCard.querySelector('.leave-badges').innerHTML = selected.map(n => `<span class="badge bg-secondary me-1 mb-1">${n}</span>`).join('');
+  currentLeaveCard.querySelector('.leave-badges').innerHTML = selected.map(n => `<span class="badge bg-secondary me-1 mb-1" style="font-size:0.7rem;">${n}</span>`).join('');
   bootstrap.Modal.getOrCreateInstance(document.getElementById('leaveModal')).hide();
 }
 
 function getQuarter(dateString) { return `Q${Math.floor((new Date(dateString).getMonth() + 3) / 3)}`; }
 
-
 // ==========================================
-// 4. 牧師登錄邏輯 (保持原樣)
+// 4. 牧師與講道登錄 (Sermon)
 // ==========================================
-
-function generateUUID() {
-  return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
 let deletedSermonUUIDs = [];
-
-async function smartProcessSermon() {
-  const textArea = document.getElementById('sermonPasteArea');
-  const text = textArea.value.trim();
-  const btn = document.getElementById('aiBtn');
-  if (!text) return alert("請先在下方框框貼入文字！");
-
-  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-  const tabbedLines = lines.filter(l => l.split('\t').length >= 3); 
-
-  if (tabbedLines.length > 0 && tabbedLines.length >= lines.length / 2) {
-    lines.forEach(rowStr => {
-      let cols = rowStr.split('\t'); 
-      if (!cols[0] || cols[0].includes('日期')) return; 
-      let d = cols[0].trim().replace(/\//g, '-');
-      if (cols.length >= 5) { addSermonRow('', d, cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim(), cols[4]?.trim()); }
-      else { addSermonRow('', d, '主日', cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim()); }
-    });
-    textArea.value = ""; return; 
-  }
-
-  btn.disabled = true; let sec = 0;
-  btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 思考中... (${sec}秒)`;
-  const timer = setInterval(() => { sec++; btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 思考中... (${sec}秒)`; }, 1000);
-
-  try {
-    const result = await callAPI('parseSermonWithAI', { text: text });
-    clearInterval(timer);
-    if (result.status === 'success' && Array.isArray(result.data)) {
-      result.data.forEach(item => {
-        let rows = document.querySelectorAll('#sermonTbody tr'), isFound = false;
-        for (let tr of rows) {
-          if (tr.querySelector('.sermon-date').value === item.日期 && tr.querySelector('.sermon-type').value.trim() === item.聚會類別) {
-            tr.querySelector('.sermon-pastor').value = item.牧師 || "";
-            tr.querySelector('.sermon-title').value = item.題目 || "";
-            tr.querySelector('.sermon-scripture').value = item.經文 || "";
-            tr.classList.add('table-success-flash'); setTimeout(() => tr.classList.remove('table-success-flash'), 1500);
-            isFound = true; break;
-          }
-        }
-        if (!isFound) addSermonRow('', item.日期, item.聚會類別, item.牧師, item.題目, item.經文);
-      });
-      textArea.value = ""; 
-    }
-  } catch (err) { clearInterval(timer); alert("❌ 系統錯誤：" + err.message); } 
-  finally { btn.disabled = false; btn.innerHTML = "✨ 智慧處理 (Excel / AI)"; }
-}
 
 async function loadSermonData() {
   deletedSermonUUIDs = []; 
@@ -449,7 +384,7 @@ async function loadSermonData() {
 }
 
 function addSermonRow(uuid, date, type, pastor, title, scripture) {
-  const rowId = uuid || generateUUID();
+  const rowId = uuid || 'uuid-' + Math.random().toString(36).substr(2, 9);
   const tbody = document.getElementById('sermonTbody');
   const tr = document.createElement('tr');
   tr.innerHTML = `
@@ -457,8 +392,8 @@ function addSermonRow(uuid, date, type, pastor, title, scripture) {
     <td><input type="date" class="form-control form-control-sm sermon-date" value="${date}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-type text-center text-primary fw-bold" value="${type || '主日'}" onclick="this.select()"></td>
     <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}" onclick="this.select()"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}" onclick="this.select()" placeholder="貼上題目"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}" onclick="this.select()" placeholder="貼上經文"></td>
+    <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}" onclick="this.select()" placeholder="題目"></td>
+    <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}" onclick="this.select()" placeholder="經文"></td>
     <td class="text-center align-middle"><button class="btn btn-sm btn-outline-danger" onclick="removeSermonRow(this)">x</button></td>
   `;
   tbody.appendChild(tr);
@@ -467,21 +402,50 @@ function addSermonRow(uuid, date, type, pastor, title, scripture) {
 function removeSermonRow(btn) {
   const tr = btn.closest('tr');
   const uuid = tr.querySelector('.sermon-uuid').value;
-  if (uuid) deletedSermonUUIDs.push(uuid);
+  if (uuid && !uuid.startsWith('uuid-')) deletedSermonUUIDs.push(uuid);
   tr.remove();
+}
+
+async function smartProcessSermon() {
+  const textArea = document.getElementById('sermonPasteArea');
+  const text = textArea.value.trim();
+  const btn = document.getElementById('aiBtn');
+  if (!text) return alert("請先貼入文字！");
+
+  btn.disabled = true; let sec = 0;
+  btn.innerHTML = `AI 分析中... (${sec}s)`;
+  const timer = setInterval(() => { sec++; btn.innerHTML = `AI 分析中... (${sec}s)`; }, 1000);
+
+  try {
+    const result = await callAPI('parseSermonWithAI', { text: text });
+    clearInterval(timer);
+    if (result.status === 'success' && Array.isArray(result.data)) {
+      result.data.forEach(item => {
+        let rows = document.querySelectorAll('#sermonTbody tr'), isFound = false;
+        for (let tr of rows) {
+          if (tr.querySelector('.sermon-date').value === item.日期) {
+            tr.querySelector('.sermon-pastor').value = item.牧師 || "";
+            tr.querySelector('.sermon-title').value = item.題目 || "";
+            tr.querySelector('.sermon-scripture').value = item.經文 || "";
+            isFound = true; break;
+          }
+        }
+        if (!isFound) addSermonRow('', item.日期, item.聚會類別, item.牧師, item.題目, item.經文);
+      });
+      textArea.value = ""; 
+    }
+  } catch (err) { clearInterval(timer); alert("解析失敗"); } 
+  finally { btn.disabled = false; btn.innerHTML = "✨ 智慧處理 (Excel / AI)"; }
 }
 
 async function saveSermonData() {
   let finalSermonData = [];
   document.querySelectorAll('#sermonTbody tr').forEach(tr => {
     let date = tr.querySelector('.sermon-date').value;
-    let type = tr.querySelector('.sermon-type').value.trim();
-    if (date && type) {
+    if (date) {
       finalSermonData.push({
-        'UUID': tr.querySelector('.sermon-uuid').value, '日期': date, '聚會類別': type,
-        '牧師': tr.querySelector('.sermon-pastor').value.trim(),
-        '題目': tr.querySelector('.sermon-title').value.trim(),
-        '經文': tr.querySelector('.sermon-scripture').value.trim()
+        'UUID': tr.querySelector('.sermon-uuid').value, '日期': date, '聚會類別': tr.querySelector('.sermon-type').value.trim(),
+        '牧師': tr.querySelector('.sermon-pastor').value.trim(), '題目': tr.querySelector('.sermon-title').value.trim(), '經文': tr.querySelector('.sermon-scripture').value.trim()
       });
     }
   });
@@ -489,7 +453,7 @@ async function saveSermonData() {
   btn.disabled = true; btn.innerText = "儲存中...";
   try {
     await callAPI('saveSermonInfo', { sermonData: finalSermonData, deletedUUIDs: deletedSermonUUIDs });
-    alert("✅ 講員資訊儲存成功！"); switchTab('dashboard');
-  } catch(error) { alert("❌ 儲存失敗！"); }
+    alert("✅ 講員資訊儲存成功！"); loadDashboard(); switchTab('dashboard');
+  } catch(error) { alert("儲存失敗"); }
   finally { btn.disabled = false; btn.innerText = "儲存至資料庫"; }
 }
