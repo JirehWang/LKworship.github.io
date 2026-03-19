@@ -43,7 +43,7 @@ function switchTab(tabId) {
 }
 
 // ==========================================
-// 1. 公佈欄邏輯 (支援中斷請求)
+// 1. 公佈欄邏輯
 // ==========================================
 async function loadDashboard() {
   const container = document.getElementById('dashboardContainer');
@@ -281,71 +281,77 @@ async function saveGeneratedSchedule() {
   btn.disabled = false;
 }
 
+function getQuarter(dateString) { return `Q${Math.floor((new Date(dateString).getMonth() + 3) / 3)}`; }
+
+
 // ==========================================
-// 4. 牧師登錄 (保留 Excel 貼上 + AI 智慧功能)
+// 4. 牧師登錄 (智慧總機：一鍵支援 Excel & AI)
 // ==========================================
 
 /**
- * 🌟 終極相容版：解決手機無法貼上、且保留 Excel 轉換功能
+ * 🌟 智慧判斷總機：一鍵處理所有格式
  */
-function handleSermonPaste(e) {
-  // 不使用 e.preventDefault() 阻擋原生貼上！
-  // 讓手機原生鍵盤乖乖把字貼進去後，我們等 0.05 秒再來檢查內容
-  setTimeout(() => {
-    let textArea = e.target;
-    let pasteData = textArea.value;
-    
-    // 嚴格判斷：如果貼上的內容包含 Tab，且看起來像是一格一格的 Excel 表格
-    if (pasteData.includes('\t')) {
-      let rows = pasteData.split(/\r?\n/);
-      // 如果第一行有超過 2 個 Tab（代表至少有 3 欄資料），才認定為 Excel
-      if (rows[0].split('\t').length >= 3) {
-        rows.forEach(rowStr => {
-          let cols = rowStr.split('\t'); 
-          if (!cols[0] || cols[0].includes('日期')) return; // 跳過標題列
-          
-          let d = cols[0].trim().replace(/\//g, '-');
-          if (cols.length >= 5) {
-            addSermonRow(d, cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim(), cols[4]?.trim());
-          } else {
-            addSermonRow(d, '主日', cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim());
-          }
-        });
-        textArea.value = ""; // 轉換成表格後清空框框
+async function smartProcessSermon() {
+  const textArea = document.getElementById('sermonPasteArea');
+  const text = textArea.value.trim();
+  const btn = document.getElementById('aiBtn');
+  if (!text) return alert("請先在下方框框貼入文字！");
+
+  // 1. 偵測是否為 Excel 格式 (特徵：每一行都有好幾個 Tab 鍵)
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+  const tabbedLines = lines.filter(l => l.split('\t').length >= 3); // 只要有兩個以上的 Tab 就認定是表格列
+
+  // 如果貼上的內容超過一半都是表格，認定為 Excel，直接秒殺處理 (不用呼叫 AI)
+  if (tabbedLines.length > 0 && tabbedLines.length >= lines.length / 2) {
+    lines.forEach(rowStr => {
+      let cols = rowStr.split('\t'); 
+      if (!cols[0] || cols[0].includes('日期')) return; // 跳過標題列
+      
+      let d = cols[0].trim().replace(/\//g, '-');
+      if (cols.length >= 5) {
+        addSermonRow(d, cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim(), cols[4]?.trim());
+      } else {
+        addSermonRow(d, '主日', cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim());
       }
-    }
-  }, 50);
-}
+    });
+    textArea.value = ""; // 轉換完成，清空輸入框
+    return; // 結束流程
+  }
 
-/**
- * 🌟 AI 智慧解析
- */
-async function aiParseSermon() {
-  const textArea = document.getElementById('sermonPasteArea'), text = textArea.value.trim(), btn = document.getElementById('aiBtn');
-  if (!text) return alert("請貼入文字");
-  btn.disabled = true; btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 解析中...`;
+  // 2. 如果不是 Excel (例如 Line 訊息)，交給 AI 解析
+  btn.disabled = true; 
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 解析中...`;
 
   try {
-    const result = await callAPI('parseSermonWithAI', { text });
-    if (result.status === 'success') {
+    const result = await callAPI('parseSermonWithAI', { text: text });
+    if (result.status === 'success' && Array.isArray(result.data)) {
       result.data.forEach(item => {
-        let rows = document.querySelectorAll('#sermonTbody tr'), found = false;
+        let rows = document.querySelectorAll('#sermonTbody tr'), isFound = false;
+
         for (let tr of rows) {
-          const d = tr.querySelector('.sermon-date').value, t = tr.querySelector('.sermon-type').value.trim();
-          if (d === item.日期 && t === item.聚會類別) {
+          const dVal = tr.querySelector('.sermon-date').value;
+          const tVal = tr.querySelector('.sermon-type').value.trim();
+          
+          if (dVal === item.日期 && tVal === item.聚會類別) {
             tr.querySelector('.sermon-pastor').value = item.牧師 || "";
             tr.querySelector('.sermon-title').value = item.題目 || "";
             tr.querySelector('.sermon-scripture').value = item.經文 || "";
-            tr.classList.add('table-success-flash'); setTimeout(() => tr.classList.remove('table-success-flash'), 1500);
-            found = true; break;
+            tr.classList.add('table-success-flash');
+            setTimeout(() => tr.classList.remove('table-success-flash'), 1500);
+            isFound = true;
+            break;
           }
         }
-        if (!found) addSermonRow(item.日期, item.聚會類別, item.牧師, item.題目, item.經文);
+        if (!isFound) addSermonRow(item.日期, item.聚會類別, item.牧師, item.題目, item.經文);
       });
-      textArea.value = "";
+      textArea.value = ""; 
     }
-  } catch (e) { alert("AI 解析失敗"); }
-  btn.disabled = false; btn.innerHTML = "✨ AI 智慧解析";
+  } catch (err) { 
+    alert("AI 解析發生錯誤，請檢查網路或 API 設定。"); 
+  } finally { 
+    btn.disabled = false; 
+    btn.innerHTML = "✨ 智慧處理 (Excel / AI)"; 
+  }
 }
 
 async function loadSermonData() {
@@ -359,23 +365,27 @@ function addSermonRow(date, type, pastor, title, scripture) {
   const tbody = document.getElementById('sermonTbody'), tr = document.createElement('tr');
   tr.innerHTML = `
     <td><input type="date" class="form-control form-control-sm sermon-date" value="${date}"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-type text-center" value="${type || '主日'}"></td>
+    <td><input type="text" class="form-control form-control-sm sermon-type text-center text-primary fw-bold" value="${type || '主日'}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}"></td>
-    <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">x</button></td>
+    <td class="text-center align-middle"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">x</button></td>
   `;
   tbody.appendChild(tr);
 }
 
 async function saveSermonData() {
-  let data = [];
+  let finalSermonData = [];
   document.querySelectorAll('#sermonTbody tr').forEach(tr => {
-    let d = tr.querySelector('.sermon-date').value;
-    if (d) data.push({ '日期': d, '聚會類別': tr.querySelector('.sermon-type').value.trim(), '牧師': tr.querySelector('.sermon-pastor').value.trim(), '題目': tr.querySelector('.sermon-title').value.trim(), '經文': tr.querySelector('.sermon-scripture').value.trim() });
+    let date = tr.querySelector('.sermon-date').value;
+    let type = tr.querySelector('.sermon-type').value.trim();
+    if (date && type) {
+      finalSermonData.push({ '日期': date, '聚會類別': type, '牧師': tr.querySelector('.sermon-pastor').value.trim(), '題目': tr.querySelector('.sermon-title').value.trim(), '經文': tr.querySelector('.sermon-scripture').value.trim() });
+    }
   });
   const btn = document.querySelector('button[onclick="saveSermonData()"]');
-  btn.disabled = true;
-  await callAPI('saveSermonInfo', { sermonData: data });
-  alert("✅ 講員資訊已儲存！"); btn.disabled = false; switchTab('dashboard');
+  if (btn) { btn.disabled = true; btn.innerText = "儲存中..."; }
+  await callAPI('saveSermonInfo', { sermonData: finalSermonData });
+  alert("✅ 講員資訊儲存成功！"); switchTab('dashboard');
+  if (btn) { btn.disabled = false; btn.innerText = "儲存至資料庫"; }
 }
