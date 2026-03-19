@@ -17,13 +17,29 @@ window.onload = () => {
   loadDashboard();
 };
 
-// --- 通用 API 呼叫 ---
+// 🌟 強化版 API 呼叫 (遇到死機或回傳 HTML 網頁時，會直接印出凶手)
 async function callAPI(action, payload) {
-  const response = await fetch(API_URL, { 
-    method: 'POST', 
-    body: JSON.stringify({ action: action, ...payload }) 
-  });
-  return await response.json();
+  try {
+    const response = await fetch(API_URL, { 
+      method: 'POST', 
+      body: JSON.stringify({ action: action, ...payload }) 
+    });
+    
+    // 先把後端傳回來的東西當成「純文字」接下來
+    const rawText = await response.text();
+    
+    try {
+      // 嘗試把它翻譯成 JSON 陣列
+      return JSON.parse(rawText);
+    } catch (parseError) {
+      // 如果翻譯失敗（代表後端傳了亂碼或 HTML 錯誤網頁回來）
+      console.error("❌ 後端崩潰！回傳的不是 JSON，原始內容是：\n", rawText);
+      throw new Error("後端回傳格式異常 (可能是 GAS 權限沒開，或代碼有語法錯誤)");
+    }
+  } catch (networkError) {
+    console.error("❌ 網路連線失敗：", networkError);
+    throw networkError;
+  }
 }
 
 // --- 頁籤切換邏輯 ---
@@ -288,7 +304,6 @@ function getQuarter(dateString) { return `Q${Math.floor((new Date(dateString).ge
 // 4. 牧師登錄 (智慧總機 + UUID 精準追蹤)
 // ==========================================
 
-// 🌟 產生 UUID 的工具函式
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, function(c) {
@@ -297,7 +312,6 @@ function generateUUID() {
   });
 }
 
-// 🌟 紀錄準備要刪除的 UUID
 let deletedSermonUUIDs = [];
 
 async function smartProcessSermon() {
@@ -309,14 +323,12 @@ async function smartProcessSermon() {
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
   const tabbedLines = lines.filter(l => l.split('\t').length >= 3); 
 
-  // Excel 處理
   if (tabbedLines.length > 0 && tabbedLines.length >= lines.length / 2) {
     lines.forEach(rowStr => {
       let cols = rowStr.split('\t'); 
       if (!cols[0] || cols[0].includes('日期')) return; 
       
       let d = cols[0].trim().replace(/\//g, '-');
-      // 🌟 注意第一個參數傳入空字串，讓它自動生成 UUID
       if (cols.length >= 5) {
         addSermonRow('', d, cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim(), cols[4]?.trim());
       } else {
@@ -327,12 +339,15 @@ async function smartProcessSermon() {
     return; 
   }
 
-  // AI 處理
   btn.disabled = true; 
   btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 解析中...`;
 
   try {
     const result = await callAPI('parseSermonWithAI', { text: text });
+    
+    // 🌟 在這裡！把 AI 成功解析後的包裹內容印出來！
+    console.log("📦 AI 解析成功，回傳結果：", result);
+
     if (result.status === 'success' && Array.isArray(result.data)) {
       result.data.forEach(item => {
         let rows = document.querySelectorAll('#sermonTbody tr'), isFound = false;
@@ -354,9 +369,13 @@ async function smartProcessSermon() {
         if (!isFound) addSermonRow('', item.日期, item.聚會類別, item.牧師, item.題目, item.經文);
       });
       textArea.value = ""; 
+    } else {
+      console.warn("⚠️ AI 回傳的狀態不是 success，或是 data 不是陣列：", result);
     }
   } catch (err) { 
-    alert("AI 解析發生錯誤，請檢查網路。"); 
+    // 🌟 在這裡！如果發生錯誤，用彈跳視窗大聲告訴你原因！
+    alert("❌ 系統發生錯誤！\n\n原因：" + err.message + "\n\n請打開右下角小齒輪 (Console) 查看紅色錯誤細節。"); 
+    console.error("🔥 發生例外錯誤：", err);
   } finally { 
     btn.disabled = false; 
     btn.innerHTML = "✨ 智慧處理 (Excel / AI)"; 
@@ -364,20 +383,24 @@ async function smartProcessSermon() {
 }
 
 async function loadSermonData() {
-  deletedSermonUUIDs = []; // 🌟 重新載入時清空垃圾桶
+  deletedSermonUUIDs = []; 
   const tbody = document.getElementById('sermonTbody');
-  const result = await callAPI('getSermonInfo', {});
-  tbody.innerHTML = '';
   
-  if (result.status === 'success' && result.data.length) {
-    // 🌟 把後端的 UUID 傳進去綁定
-    result.data.forEach(r => addSermonRow(r.UUID, r.日期, r.聚會類別, r.牧師, r.題目, r.經文));
-  } else {
-    addSermonRow('', '', '主日', '', '', '');
+  try {
+    const result = await callAPI('getSermonInfo', {});
+    tbody.innerHTML = '';
+    
+    if (result.status === 'success' && result.data.length) {
+      result.data.forEach(r => addSermonRow(r.UUID, r.日期, r.聚會類別, r.牧師, r.題目, r.經文));
+    } else {
+      addSermonRow('', '', '主日', '', '', '');
+    }
+  } catch (error) {
+    console.error("讀取資料庫失敗：", error);
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">讀取資料庫失敗，請重整頁面</td></tr>';
   }
 }
 
-// 🌟 新增 uuid 參數，並加入隱藏的 <input>
 function addSermonRow(uuid, date, type, pastor, title, scripture) {
   const rowId = uuid || generateUUID();
   const tbody = document.getElementById('sermonTbody');
@@ -394,7 +417,6 @@ function addSermonRow(uuid, date, type, pastor, title, scripture) {
   tbody.appendChild(tr);
 }
 
-// 🌟 專門處理刪除的函式，把刪掉的 UUID 丟進垃圾桶
 function removeSermonRow(btn) {
   const tr = btn.closest('tr');
   const uuid = tr.querySelector('.sermon-uuid').value;
@@ -407,7 +429,7 @@ async function saveSermonData() {
   document.querySelectorAll('#sermonTbody tr').forEach(tr => {
     let date = tr.querySelector('.sermon-date').value;
     let type = tr.querySelector('.sermon-type').value.trim();
-    let uuid = tr.querySelector('.sermon-uuid').value; // 🌟 抓出隱藏的身分證
+    let uuid = tr.querySelector('.sermon-uuid').value; 
     if (date && type) {
       finalSermonData.push({
         'UUID': uuid,
@@ -423,9 +445,12 @@ async function saveSermonData() {
   const btn = document.querySelector('button[onclick="saveSermonData()"]');
   if (btn) { btn.disabled = true; btn.innerText = "儲存中..."; }
   
-  // 🌟 把畫面的資料，和垃圾桶裡的 UUID 一起送給後端
-  await callAPI('saveSermonInfo', { sermonData: finalSermonData, deletedUUIDs: deletedSermonUUIDs });
-  
-  alert("✅ 講員資訊儲存成功！"); switchTab('dashboard');
-  if (btn) { btn.disabled = false; btn.innerText = "儲存至資料庫"; }
+  try {
+    await callAPI('saveSermonInfo', { sermonData: finalSermonData, deletedUUIDs: deletedSermonUUIDs });
+    alert("✅ 講員資訊儲存成功！"); switchTab('dashboard');
+  } catch(error) {
+    alert("❌ 儲存失敗！\n原因：" + error.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerText = "儲存至資料庫"; }
+  }
 }
