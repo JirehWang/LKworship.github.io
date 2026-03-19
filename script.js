@@ -285,40 +285,49 @@ function getQuarter(dateString) { return `Q${Math.floor((new Date(dateString).ge
 
 
 // ==========================================
-// 4. 牧師登錄 (智慧總機：一鍵支援 Excel & AI)
+// 4. 牧師登錄 (智慧總機 + UUID 精準追蹤)
 // ==========================================
 
-/**
- * 🌟 智慧判斷總機：一鍵處理所有格式
- */
+// 🌟 產生 UUID 的工具函式
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxx-xxxx-4xxx-yxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// 🌟 紀錄準備要刪除的 UUID
+let deletedSermonUUIDs = [];
+
 async function smartProcessSermon() {
   const textArea = document.getElementById('sermonPasteArea');
   const text = textArea.value.trim();
   const btn = document.getElementById('aiBtn');
   if (!text) return alert("請先在下方框框貼入文字！");
 
-  // 1. 偵測是否為 Excel 格式 (特徵：每一行都有好幾個 Tab 鍵)
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-  const tabbedLines = lines.filter(l => l.split('\t').length >= 3); // 只要有兩個以上的 Tab 就認定是表格列
+  const tabbedLines = lines.filter(l => l.split('\t').length >= 3); 
 
-  // 如果貼上的內容超過一半都是表格，認定為 Excel，直接秒殺處理 (不用呼叫 AI)
+  // Excel 處理
   if (tabbedLines.length > 0 && tabbedLines.length >= lines.length / 2) {
     lines.forEach(rowStr => {
       let cols = rowStr.split('\t'); 
-      if (!cols[0] || cols[0].includes('日期')) return; // 跳過標題列
+      if (!cols[0] || cols[0].includes('日期')) return; 
       
       let d = cols[0].trim().replace(/\//g, '-');
+      // 🌟 注意第一個參數傳入空字串，讓它自動生成 UUID
       if (cols.length >= 5) {
-        addSermonRow(d, cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim(), cols[4]?.trim());
+        addSermonRow('', d, cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim(), cols[4]?.trim());
       } else {
-        addSermonRow(d, '主日', cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim());
+        addSermonRow('', d, '主日', cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim());
       }
     });
-    textArea.value = ""; // 轉換完成，清空輸入框
-    return; // 結束流程
+    textArea.value = ""; 
+    return; 
   }
 
-  // 2. 如果不是 Excel (例如 Line 訊息)，交給 AI 解析
+  // AI 處理
   btn.disabled = true; 
   btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 解析中...`;
 
@@ -342,12 +351,12 @@ async function smartProcessSermon() {
             break;
           }
         }
-        if (!isFound) addSermonRow(item.日期, item.聚會類別, item.牧師, item.題目, item.經文);
+        if (!isFound) addSermonRow('', item.日期, item.聚會類別, item.牧師, item.題目, item.經文);
       });
       textArea.value = ""; 
     }
   } catch (err) { 
-    alert("AI 解析發生錯誤，請檢查網路或 API 設定。"); 
+    alert("AI 解析發生錯誤，請檢查網路。"); 
   } finally { 
     btn.disabled = false; 
     btn.innerHTML = "✨ 智慧處理 (Excel / AI)"; 
@@ -355,23 +364,42 @@ async function smartProcessSermon() {
 }
 
 async function loadSermonData() {
+  deletedSermonUUIDs = []; // 🌟 重新載入時清空垃圾桶
   const tbody = document.getElementById('sermonTbody');
   const result = await callAPI('getSermonInfo', {});
   tbody.innerHTML = '';
-  result.status === 'success' && result.data.length ? result.data.forEach(r => addSermonRow(r.日期, r.聚會類別, r.牧師, r.題目, r.經文)) : addSermonRow('', '主日', '', '', '');
+  
+  if (result.status === 'success' && result.data.length) {
+    // 🌟 把後端的 UUID 傳進去綁定
+    result.data.forEach(r => addSermonRow(r.UUID, r.日期, r.聚會類別, r.牧師, r.題目, r.經文));
+  } else {
+    addSermonRow('', '', '主日', '', '', '');
+  }
 }
 
-function addSermonRow(date, type, pastor, title, scripture) {
-  const tbody = document.getElementById('sermonTbody'), tr = document.createElement('tr');
+// 🌟 新增 uuid 參數，並加入隱藏的 <input>
+function addSermonRow(uuid, date, type, pastor, title, scripture) {
+  const rowId = uuid || generateUUID();
+  const tbody = document.getElementById('sermonTbody');
+  const tr = document.createElement('tr');
   tr.innerHTML = `
+    <input type="hidden" class="sermon-uuid" value="${rowId}">
     <td><input type="date" class="form-control form-control-sm sermon-date" value="${date}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-type text-center text-primary fw-bold" value="${type || '主日'}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}"></td>
     <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}"></td>
-    <td class="text-center align-middle"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()">x</button></td>
+    <td class="text-center align-middle"><button class="btn btn-sm btn-outline-danger" onclick="removeSermonRow(this)">x</button></td>
   `;
   tbody.appendChild(tr);
+}
+
+// 🌟 專門處理刪除的函式，把刪掉的 UUID 丟進垃圾桶
+function removeSermonRow(btn) {
+  const tr = btn.closest('tr');
+  const uuid = tr.querySelector('.sermon-uuid').value;
+  if (uuid) deletedSermonUUIDs.push(uuid);
+  tr.remove();
 }
 
 async function saveSermonData() {
@@ -379,13 +407,25 @@ async function saveSermonData() {
   document.querySelectorAll('#sermonTbody tr').forEach(tr => {
     let date = tr.querySelector('.sermon-date').value;
     let type = tr.querySelector('.sermon-type').value.trim();
+    let uuid = tr.querySelector('.sermon-uuid').value; // 🌟 抓出隱藏的身分證
     if (date && type) {
-      finalSermonData.push({ '日期': date, '聚會類別': type, '牧師': tr.querySelector('.sermon-pastor').value.trim(), '題目': tr.querySelector('.sermon-title').value.trim(), '經文': tr.querySelector('.sermon-scripture').value.trim() });
+      finalSermonData.push({
+        'UUID': uuid,
+        '日期': date,
+        '聚會類別': type,
+        '牧師': tr.querySelector('.sermon-pastor').value.trim(),
+        '題目': tr.querySelector('.sermon-title').value.trim(),
+        '經文': tr.querySelector('.sermon-scripture').value.trim()
+      });
     }
   });
+  
   const btn = document.querySelector('button[onclick="saveSermonData()"]');
   if (btn) { btn.disabled = true; btn.innerText = "儲存中..."; }
-  await callAPI('saveSermonInfo', { sermonData: finalSermonData });
+  
+  // 🌟 把畫面的資料，和垃圾桶裡的 UUID 一起送給後端
+  await callAPI('saveSermonInfo', { sermonData: finalSermonData, deletedUUIDs: deletedSermonUUIDs });
+  
   alert("✅ 講員資訊儲存成功！"); switchTab('dashboard');
   if (btn) { btn.disabled = false; btn.innerText = "儲存至資料庫"; }
 }
