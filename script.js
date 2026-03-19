@@ -1,7 +1,14 @@
 /* script.js - 敬拜團服事管理系統 (Pro 終極修正版 - 日期對接優化) */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
+const result = await callAPI('getScheduleByDateRange', { 
+  startDate: start, 
+  endDate: end 
+});
 
+// 🔍 加這行
+console.log('DEBUG:', JSON.stringify(result.debug, null, 2));
+alert(JSON.stringify(result.debug, null, 2)); // 直接彈窗看結果
 // --- 全域變數 ---
 let currentPositions = []; 
 let generatedScheduleData = []; 
