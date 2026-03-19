@@ -66,29 +66,59 @@
     <div class="row">
       <div class="col-md-3">
         <div class="card p-3 border-0 bg-light mb-3 shadow-sm">
-          <label class="fw-bold text-primary mb-2">1. 產生全新排班</label>
+          <label class="fw-bold text-primary mb-2">Step 1. 準備日期與請假</label>
+          <p class="text-muted extra-small">先在日曆選取日期並「確認新增」，才能執行後續功能。</p>
           <input type="text" id="multiDatePicker" class="form-control mb-2 bg-white" placeholder="點此打開日曆多選...">
-          <button class="btn btn-sm btn-primary w-100 fw-bold" onclick="addSelectedDates()">確認新增日期</button>
-          <div id="dateSettingsContainer" class="mt-3" style="max-height: 350px; overflow-y: auto;"></div>
-          <button class="btn btn-danger w-100 mt-3 fw-bold" onclick="generateSchedule()">產生排班預覽 🚀</button>
+          <button class="btn btn-sm btn-primary w-100 fw-bold mb-3" onclick="addSelectedDates()">確認新增日期</button>
+          
+          <div id="dateSettingsContainer" style="max-height: 250px; overflow-y: auto; border-top: 1px solid #dee2e6; padding-top: 10px;">
+          </div>
         </div>
-        <div class="card p-3 border-0 bg-success bg-opacity-10 shadow-sm">
-          <label class="fw-bold text-success mb-2">2. 讀取現有排班</label>
-          <input type="date" id="editStartDate" class="form-control form-control-sm mb-1">
-          <input type="date" id="editEndDate" class="form-control form-control-sm mb-2">
-          <button class="btn btn-sm btn-success w-100 fw-bold" onclick="loadExistingSchedule()">讀取資料 📥</button>
+
+        <div class="card p-3 border-primary border-opacity-25 shadow-sm">
+          <label class="fw-bold text-dark mb-3">Step 2. 選擇執行功能</label>
+          
+          <div class="mb-3">
+            <button class="btn btn-danger w-100 fw-bold" onclick="generateSchedule()">
+              🚀 1. 自動產生新班表
+            </button>
+            <small class="text-muted d-block mt-1">依排班規則與請假產生</small>
+          </div>
+
+          <hr>
+
+          <div class="mb-3">
+            <button class="btn btn-outline-success w-100 fw-bold" onclick="loadScheduleByQuarter()">
+              📅 2. 按季度讀取舊表
+            </button>
+            <small class="text-muted d-block mt-1">讀取右上方選定之整季資料</small>
+          </div>
+
+          <div class="mb-1">
+            <button class="btn btn-outline-primary w-100 fw-bold" onclick="loadScheduleBySelectedDates()">
+              🔍 3. 讀取左側日期舊表
+            </button>
+            <small class="text-muted d-block mt-1">僅讀取上方清單列出的日期</small>
+          </div>
         </div>
       </div>
+
       <div class="col-md-9">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold text-primary mb-0">排班預覽編輯</h5>
-          <button class="btn btn-success fw-bold px-4 shadow-sm" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存並發佈</button>
+          <h5 class="fw-bold text-primary mb-0">排班預覽編輯區</h5>
+          <button class="btn btn-success fw-bold px-4 shadow-sm" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存並發佈至雲端</button>
         </div>
+        
         <div class="table-scroll-container" id="previewContainer" style="display: none;">
-          <table class="modern-table"><thead id="previewThead"></thead><tbody id="previewTbody"></tbody></table>
+          <table class="modern-table">
+            <thead id="previewThead"></thead>
+            <tbody id="previewTbody"></tbody>
+          </table>
         </div>
+        
         <div id="previewPlaceholder" class="text-center text-muted mt-4 p-5 bg-light rounded-3 border">
-          <h5 class="text-secondary">請先在左側設定條件並產生預覽</h5>
+          <h5 class="text-secondary">請選擇左側功能按鈕以載入或產生資料</h5>
+          <p class="small">您可以選擇「自動產生」或「讀取舊資料」來開始編輯</p>
         </div>
       </div>
     </div>
@@ -104,10 +134,10 @@
     </div>
     
     <div class="alert alert-info shadow-sm border-0 small">
-      💡 <strong>無痛貼上：</strong>不管是在手機還是電腦，直接把 <strong>Excel 表格</strong> 或長篇 <strong>Line 訊息</strong> 整坨貼進來，點擊上方「智慧處理」按鈕，系統會自動判斷！
+      💡 <strong>無痛貼上：</strong>直接把 <strong>Excel 表格</strong> 或 <strong>Line 訊息</strong> 貼進來，點擊「智慧處理」即可！
     </div>
 
-    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light shadow-sm" rows="8" placeholder="📋 點此貼上文字，不限行數..."></textarea>
+    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light shadow-sm" rows="6" placeholder="📋 點此貼上文字..."></textarea>
     
     <div class="table-responsive bg-white rounded-3 shadow-sm border mb-3">
       <table class="table table-hover mb-0 align-middle">
@@ -132,7 +162,7 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold">選擇請假人員 <span id="leaveModalDate" class="text-primary ms-2 fs-6"></span></h5>
+        <h5 class="modal-title fw-bold">選擇請假人員</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" id="leaveModalBody"></div>
