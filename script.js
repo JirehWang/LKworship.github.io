@@ -17,21 +17,19 @@ window.onload = () => {
   loadDashboard();
 };
 
-// 🌟 強化版 API 呼叫 (遇到死機或回傳 HTML 網頁時，會直接印出凶手)
+// 🌟 強化版 API 呼叫
 async function callAPI(action, payload) {
   try {
     const response = await fetch(API_URL, { 
       method: 'POST', 
       body: JSON.stringify({ action: action, ...payload }) 
     });
-    
     const rawText = await response.text();
-    
     try {
       return JSON.parse(rawText);
     } catch (parseError) {
-      console.error("❌ 後端崩潰！回傳的不是 JSON，原始內容是：\n", rawText);
-      throw new Error("後端回傳格式異常 (可能是 GAS 權限沒開，或代碼有語法錯誤)");
+      console.error("❌ 後端崩潰！回傳內容：\n", rawText);
+      throw new Error("後端回傳格式異常");
     }
   } catch (networkError) {
     console.error("❌ 網路連線失敗：", networkError);
@@ -123,17 +121,25 @@ async function loadPositions() {
   if (result.status === 'success') {
     result.data.length === 0 ? addPositionRow('主領', '', '是') : result.data.forEach(i => addPositionRow(i.positionName, i.personnel, i.isRequired || '是'));
     if (sortablePositions) sortablePositions.destroy();
-    sortablePositions = new Sortable(tbody, { handle: '.drag-handle', animation: 150 });
+    
+    // 🌟 優化拖移設定，防止鎖死手機貼上功能
+    sortablePositions = new Sortable(tbody, { 
+        handle: '.drag-handle', 
+        animation: 150,
+        filter: 'input, select, button', // 點擊這些元件時不觸發拖移
+        preventOnFilter: false           // 確保點擊後焦點能進入輸入框
+    });
   }
 }
 
 function addPositionRow(posName, personnel, isRequired = "是") {
   const tbody = document.getElementById('positionsTbody');
   const tr = document.createElement('tr');
+  // 🌟 加入 onclick="this.select()" 方便貼上
   tr.innerHTML = `
     <td class="text-center align-middle drag-handle" style="cursor: grab; color: #adb5bd;">☰</td>
-    <td><input type="text" class="form-control form-control-sm pos-name text-center" value="${posName}"></td>
-    <td><input type="text" class="form-control form-control-sm pos-personnel" value="${personnel}"></td>
+    <td><input type="text" class="form-control form-control-sm pos-name text-center" value="${posName}" onclick="this.select()"></td>
+    <td><input type="text" class="form-control form-control-sm pos-personnel" value="${personnel}" onclick="this.select()"></td>
     <td><select class="form-select form-select-sm pos-required"><option value="是" ${isRequired === "是" ? "selected" : ""}>必排</option><option value="否" ${isRequired === "否" ? "selected" : ""}>非必排</option></select></td>
     <td class="text-center"><button class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">x</button></td>
   `;
@@ -174,10 +180,11 @@ function addSelectedDates() {
     const dateString = flatpickr.formatDate(dateObj, "Y-m-d");
     const div = document.createElement('div');
     div.className = 'card mb-2 p-2 border-primary border-opacity-25 shadow-sm';
+    // 🌟 聚會類別輸入框加入 select()
     div.innerHTML = `
       <div class="d-flex justify-content-between align-items-center mb-2">
         <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dateString}">
-        <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold text-center" value="主日">
+        <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold text-center" value="主日" onclick="this.select()">
         <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.card').remove()">x</button>
       </div>
       <button class="btn btn-outline-secondary btn-sm w-100" onclick="openLeaveModal(this)">🔍 點選請假人員...</button>
@@ -259,8 +266,11 @@ function renderPreviewTable(data) {
       let td = document.createElement('td');
       if (h === '日期') td.innerHTML = `<span class="badge bg-secondary">${row[h]}</span>`;
       else if (h === '聚會類別') {
-        let input = document.createElement('input'); input.className = 'form-control form-control-sm text-center border-0 bg-transparent fw-bold text-primary';
-        input.value = row[h]; input.onchange = (e) => generatedScheduleData[idx][h] = e.target.value.trim();
+        let input = document.createElement('input'); 
+        input.className = 'form-control form-control-sm text-center border-0 bg-transparent fw-bold text-primary';
+        input.value = row[h]; 
+        input.onclick = function() { this.select(); }; // 🌟 點擊即全選
+        input.onchange = (e) => generatedScheduleData[idx][h] = e.target.value.trim();
         td.appendChild(input);
       } else {
         let pos = currentPositions.find(p => p.positionName === h), cands = pos?.personnel.split(',').map(s=>s.trim()).filter(x=>x) || [];
@@ -298,7 +308,7 @@ function getQuarter(dateString) { return `Q${Math.floor((new Date(dateString).ge
 
 
 // ==========================================
-// 4. 牧師登錄 (智慧總機 + UUID 精準追蹤 + 計時器)
+// 4. 牧師登錄
 // ==========================================
 
 function generateUUID() {
@@ -311,7 +321,6 @@ function generateUUID() {
 
 let deletedSermonUUIDs = [];
 
-// 🌟 升級版：帶有秒數計時器的 AI 解析函式
 async function smartProcessSermon() {
   const textArea = document.getElementById('sermonPasteArea');
   const text = textArea.value.trim();
@@ -321,12 +330,10 @@ async function smartProcessSermon() {
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
   const tabbedLines = lines.filter(l => l.split('\t').length >= 3); 
 
-  // Excel 處理秒殺區
   if (tabbedLines.length > 0 && tabbedLines.length >= lines.length / 2) {
     lines.forEach(rowStr => {
       let cols = rowStr.split('\t'); 
       if (!cols[0] || cols[0].includes('日期')) return; 
-      
       let d = cols[0].trim().replace(/\//g, '-');
       if (cols.length >= 5) {
         addSermonRow('', d, cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim(), cols[4]?.trim());
@@ -338,74 +345,54 @@ async function smartProcessSermon() {
     return; 
   }
 
-  // 🌟 AI 處理區 (啟動計時器)
   btn.disabled = true; 
   let sec = 0;
   btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 努力思考中... (${sec}秒)`;
-  
-  // 每秒更新一次按鈕文字
-  const timer = setInterval(() => {
-    sec++;
-    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 努力思考中... (${sec}秒)`;
-  }, 1000);
+  const timer = setInterval(() => { sec++; btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 努力思考中... (${sec}秒)`; }, 1000);
 
   try {
     const result = await callAPI('parseSermonWithAI', { text: text });
-    
-    clearInterval(timer); // 收到包裹，停止計時
-    console.log("📦 AI 解析成功，回傳結果：", result);
-
+    clearInterval(timer);
     if (result.status === 'success' && Array.isArray(result.data)) {
       result.data.forEach(item => {
         let rows = document.querySelectorAll('#sermonTbody tr'), isFound = false;
-
         for (let tr of rows) {
           const dVal = tr.querySelector('.sermon-date').value;
           const tVal = tr.querySelector('.sermon-type').value.trim();
-          
           if (dVal === item.日期 && tVal === item.聚會類別) {
             tr.querySelector('.sermon-pastor').value = item.牧師 || "";
             tr.querySelector('.sermon-title').value = item.題目 || "";
             tr.querySelector('.sermon-scripture').value = item.經文 || "";
             tr.classList.add('table-success-flash');
             setTimeout(() => tr.classList.remove('table-success-flash'), 1500);
-            isFound = true;
-            break;
+            isFound = true; break;
           }
         }
         if (!isFound) addSermonRow('', item.日期, item.聚會類別, item.牧師, item.題目, item.經文);
       });
       textArea.value = ""; 
-    } else {
-      console.warn("⚠️ AI 回傳的狀態異常：", result);
-      alert("⚠️ 解析完成，但資料格式有誤，請查看 Console。");
     }
   } catch (err) { 
-    clearInterval(timer); // 發生錯誤，停止計時
-    alert("❌ 系統發生錯誤！\n\n原因：" + err.message + "\n\n請打開右下角小齒輪 (Console) 查看紅色錯誤細節。"); 
-    console.error("🔥 發生例外錯誤：", err);
+    clearInterval(timer);
+    alert("❌ 系統發生錯誤！\n原因：" + err.message); 
   } finally { 
-    btn.disabled = false; 
-    btn.innerHTML = "✨ 智慧處理 (Excel / AI)"; 
+    btn.disabled = false; btn.innerHTML = "✨ 智慧處理 (Excel / AI)"; 
   }
 }
 
 async function loadSermonData() {
   deletedSermonUUIDs = []; 
   const tbody = document.getElementById('sermonTbody');
-  
   try {
     const result = await callAPI('getSermonInfo', {});
     tbody.innerHTML = '';
-    
     if (result.status === 'success' && result.data.length) {
       result.data.forEach(r => addSermonRow(r.UUID, r.日期, r.聚會類別, r.牧師, r.題目, r.經文));
     } else {
       addSermonRow('', '', '主日', '', '', '');
     }
   } catch (error) {
-    console.error("讀取資料庫失敗：", error);
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">讀取資料庫失敗，請重整頁面</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">讀取失敗</td></tr>';
   }
 }
 
@@ -413,13 +400,14 @@ function addSermonRow(uuid, date, type, pastor, title, scripture) {
   const rowId = uuid || generateUUID();
   const tbody = document.getElementById('sermonTbody');
   const tr = document.createElement('tr');
+  // 🌟 這裡所有文字輸入框都加上了 onclick="this.select()"
   tr.innerHTML = `
     <input type="hidden" class="sermon-uuid" value="${rowId}">
     <td><input type="date" class="form-control form-control-sm sermon-date" value="${date}"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-type text-center text-primary fw-bold" value="${type || '主日'}"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}"></td>
+    <td><input type="text" class="form-control form-control-sm sermon-type text-center text-primary fw-bold" value="${type || '主日'}" onclick="this.select()"></td>
+    <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}" onclick="this.select()"></td>
+    <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}" onclick="this.select()" placeholder="貼上題目"></td>
+    <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}" onclick="this.select()" placeholder="貼上經文"></td>
     <td class="text-center align-middle"><button class="btn btn-sm btn-outline-danger" onclick="removeSermonRow(this)">x</button></td>
   `;
   tbody.appendChild(tr);
@@ -440,25 +428,18 @@ async function saveSermonData() {
     let uuid = tr.querySelector('.sermon-uuid').value; 
     if (date && type) {
       finalSermonData.push({
-        'UUID': uuid,
-        '日期': date,
-        '聚會類別': type,
+        'UUID': uuid, '日期': date, '聚會類別': type,
         '牧師': tr.querySelector('.sermon-pastor').value.trim(),
         '題目': tr.querySelector('.sermon-title').value.trim(),
         '經文': tr.querySelector('.sermon-scripture').value.trim()
       });
     }
   });
-  
   const btn = document.querySelector('button[onclick="saveSermonData()"]');
   if (btn) { btn.disabled = true; btn.innerText = "儲存中..."; }
-  
   try {
     await callAPI('saveSermonInfo', { sermonData: finalSermonData, deletedUUIDs: deletedSermonUUIDs });
     alert("✅ 講員資訊儲存成功！"); switchTab('dashboard');
-  } catch(error) {
-    alert("❌ 儲存失敗！\n原因：" + error.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerText = "儲存至資料庫"; }
-  }
+  } catch(error) { alert("❌ 儲存失敗！"); }
+  finally { if (btn) { btn.disabled = false; btn.innerText = "儲存至資料庫"; } }
 }
