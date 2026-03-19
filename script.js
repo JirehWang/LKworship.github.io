@@ -25,14 +25,11 @@ async function callAPI(action, payload) {
       body: JSON.stringify({ action: action, ...payload }) 
     });
     
-    // 先把後端傳回來的東西當成「純文字」接下來
     const rawText = await response.text();
     
     try {
-      // 嘗試把它翻譯成 JSON 陣列
       return JSON.parse(rawText);
     } catch (parseError) {
-      // 如果翻譯失敗（代表後端傳了亂碼或 HTML 錯誤網頁回來）
       console.error("❌ 後端崩潰！回傳的不是 JSON，原始內容是：\n", rawText);
       throw new Error("後端回傳格式異常 (可能是 GAS 權限沒開，或代碼有語法錯誤)");
     }
@@ -301,7 +298,7 @@ function getQuarter(dateString) { return `Q${Math.floor((new Date(dateString).ge
 
 
 // ==========================================
-// 4. 牧師登錄 (智慧總機 + UUID 精準追蹤)
+// 4. 牧師登錄 (智慧總機 + UUID 精準追蹤 + 計時器)
 // ==========================================
 
 function generateUUID() {
@@ -314,6 +311,7 @@ function generateUUID() {
 
 let deletedSermonUUIDs = [];
 
+// 🌟 升級版：帶有秒數計時器的 AI 解析函式
 async function smartProcessSermon() {
   const textArea = document.getElementById('sermonPasteArea');
   const text = textArea.value.trim();
@@ -323,6 +321,7 @@ async function smartProcessSermon() {
   const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
   const tabbedLines = lines.filter(l => l.split('\t').length >= 3); 
 
+  // Excel 處理秒殺區
   if (tabbedLines.length > 0 && tabbedLines.length >= lines.length / 2) {
     lines.forEach(rowStr => {
       let cols = rowStr.split('\t'); 
@@ -339,13 +338,21 @@ async function smartProcessSermon() {
     return; 
   }
 
+  // 🌟 AI 處理區 (啟動計時器)
   btn.disabled = true; 
-  btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 解析中...`;
+  let sec = 0;
+  btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 努力思考中... (${sec}秒)`;
+  
+  // 每秒更新一次按鈕文字
+  const timer = setInterval(() => {
+    sec++;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> AI 努力思考中... (${sec}秒)`;
+  }, 1000);
 
   try {
     const result = await callAPI('parseSermonWithAI', { text: text });
     
-    // 🌟 在這裡！把 AI 成功解析後的包裹內容印出來！
+    clearInterval(timer); // 收到包裹，停止計時
     console.log("📦 AI 解析成功，回傳結果：", result);
 
     if (result.status === 'success' && Array.isArray(result.data)) {
@@ -370,10 +377,11 @@ async function smartProcessSermon() {
       });
       textArea.value = ""; 
     } else {
-      console.warn("⚠️ AI 回傳的狀態不是 success，或是 data 不是陣列：", result);
+      console.warn("⚠️ AI 回傳的狀態異常：", result);
+      alert("⚠️ 解析完成，但資料格式有誤，請查看 Console。");
     }
   } catch (err) { 
-    // 🌟 在這裡！如果發生錯誤，用彈跳視窗大聲告訴你原因！
+    clearInterval(timer); // 發生錯誤，停止計時
     alert("❌ 系統發生錯誤！\n\n原因：" + err.message + "\n\n請打開右下角小齒輪 (Console) 查看紅色錯誤細節。"); 
     console.error("🔥 發生例外錯誤：", err);
   } finally { 
