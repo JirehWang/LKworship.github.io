@@ -286,33 +286,39 @@ async function saveGeneratedSchedule() {
 // ==========================================
 
 /**
- * 🌟 核心：處理 Excel 直接貼上
+ * 🌟 終極相容版：解決手機無法貼上、且保留 Excel 轉換功能
  */
 function handleSermonPaste(e) {
-  let pasteData = (e.clipboardData || window.clipboardData).getData('text');
-  
-  // 如果內容含有 Tab 鍵，表示是從 Excel 或 Google Sheets 複製來的
-  if (pasteData.includes('\t')) {
-    e.preventDefault(); // 攔截預設的貼上動作
-    pasteData.split(/\r?\n/).forEach(rowStr => {
-      let cols = rowStr.split('\t'); 
-      if (!cols[0] || cols[0].includes('日期')) return; // 跳過標題行或空行
-      
-      let d = cols[0].trim().replace(/\//g, '-');
-      // 支援 4 欄或 5 欄的 Excel 格式
-      if (cols.length >= 5) {
-        addSermonRow(d, cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim(), cols[4]?.trim());
-      } else {
-        addSermonRow(d, '主日', cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim());
+  // 不使用 e.preventDefault() 阻擋原生貼上！
+  // 讓手機原生鍵盤乖乖把字貼進去後，我們等 0.05 秒再來檢查內容
+  setTimeout(() => {
+    let textArea = e.target;
+    let pasteData = textArea.value;
+    
+    // 嚴格判斷：如果貼上的內容包含 Tab，且看起來像是一格一格的 Excel 表格
+    if (pasteData.includes('\t')) {
+      let rows = pasteData.split(/\r?\n/);
+      // 如果第一行有超過 2 個 Tab（代表至少有 3 欄資料），才認定為 Excel
+      if (rows[0].split('\t').length >= 3) {
+        rows.forEach(rowStr => {
+          let cols = rowStr.split('\t'); 
+          if (!cols[0] || cols[0].includes('日期')) return; // 跳過標題列
+          
+          let d = cols[0].trim().replace(/\//g, '-');
+          if (cols.length >= 5) {
+            addSermonRow(d, cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim(), cols[4]?.trim());
+          } else {
+            addSermonRow(d, '主日', cols[1]?.trim(), cols[2]?.trim(), cols[3]?.trim());
+          }
+        });
+        textArea.value = ""; // 轉換成表格後清空框框
       }
-    });
-    e.target.value = ""; // 清空框框
-  }
-  // 如果沒有 Tab 鍵（例如一般的 Line 訊息），就會順利貼進框框讓 AI 處理
+    }
+  }, 50);
 }
 
 /**
- * 🌟 核心：AI 智慧解析
+ * 🌟 AI 智慧解析
  */
 async function aiParseSermon() {
   const textArea = document.getElementById('sermonPasteArea'), text = textArea.value.trim(), btn = document.getElementById('aiBtn');
