@@ -75,34 +75,45 @@
           </div>
         </div>
 
-        <div class="card p-3 border-primary border-opacity-25 shadow-sm">
-          <label class="fw-bold text-dark mb-3">Step 2. 選擇執行功能</label>
-          
-          <div class="mb-3">
-            <button class="btn btn-danger w-100 fw-bold" onclick="generateSchedule()">
-              🚀 1. 自動產生新班表
-            </button>
-            <small class="text-muted d-block mt-1">依排班規則與請假產生</small>
-          </div>
+<div class="card p-3 border-primary border-opacity-25 shadow-sm">
+  <label class="fw-bold text-dark mb-3">Step 2. 選擇執行功能</label>
+  
+  <div class="mb-3">
+    <button class="btn btn-danger w-100 fw-bold" onclick="generateSchedule()">
+      🚀 1. 自動產生新班表
+    </button>
+    <small class="text-muted d-block mt-1">依上方 Step 1 設定之日期產生</small>
+  </div>
 
-          <hr>
+  <hr>
 
-          <div class="mb-3">
-            <button class="btn btn-outline-success w-100 fw-bold" onclick="loadScheduleByQuarter()">
-              📅 2. 按季度讀取舊表
-            </button>
-            <small class="text-muted d-block mt-1">讀取右上方選定之整季資料</small>
-          </div>
+  <div class="mb-3">
+    <label class="extra-small fw-bold text-success">選擇查詢季度：</label>
+    <select id="editQuarterSelect" class="form-select form-select-sm mb-2">
+      <option value="2026-Q1">2026-Q1</option>
+      <option value="2026-Q2" selected>2026-Q2</option>
+      <option value="2026-Q3">2026-Q3</option>
+      <option value="2026-Q4">2026-Q4</option>
+    </select>
+    <button class="btn btn-outline-success w-100 fw-bold" onclick="loadScheduleByQuarter()">
+      📅 2. 按季度讀取舊表
+    </button>
+  </div>
 
-          <div class="mb-1">
-            <button class="btn btn-outline-primary w-100 fw-bold" onclick="loadScheduleBySelectedDates()">
-              🔍 3. 讀取左側日期舊表
-            </button>
-            <small class="text-muted d-block mt-1">僅讀取上方清單列出的日期</small>
-          </div>
-        </div>
-      </div>
+  <hr>
 
+  <div class="mb-1">
+    <label class="extra-small fw-bold text-primary">設定查詢區間：</label>
+    <div class="d-flex gap-1 mb-2">
+      <input type="date" id="queryStartDate" class="form-control form-control-sm">
+      <input type="date" id="queryEndDate" class="form-control form-control-sm">
+    </div>
+    <button class="btn btn-outline-primary w-100 fw-bold" onclick="loadScheduleByDateRange()">
+      🔍 3. 按區間日期讀取
+    </button>
+    <small class="text-muted d-block mt-1">讀取此區間內的所有已排班表</small>
+  </div>
+</div>
       <div class="col-md-9">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h5 class="fw-bold text-primary mb-0">排班預覽編輯區</h5>
