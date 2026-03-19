@@ -178,29 +178,40 @@ async function initScheduleTab() {
 }
 
 // 🌟 補回：讀取現有排班資料的函式
+// 🌟 完美定位版：正確讀取現有排班，且乖乖顯示在右側預覽區
 async function loadExistingSchedule() {
-  const container = document.getElementById('dateSettingsContainer');
-  if (!container) return;
+  const previewPlaceholder = document.getElementById('previewPlaceholder');
+  const previewContainer = document.getElementById('previewContainer');
   
+  if (!previewPlaceholder || !previewContainer) return;
+  
+  // 取得目前右上角選擇的季度 (例如 2026-Q2)
   const quarterSelect = document.getElementById('quarterSelect');
+  if (!quarterSelect) return;
   const [year, quarter] = quarterSelect.value.split('-');
   
-  container.innerHTML = '<div class="text-center p-3"><div class="spinner-border spinner-border-sm"></div> 讀取現有資料中...</div>';
+  // 先把預覽表格藏起來，在右邊顯示讀取中的動畫
+  previewContainer.style.display = 'none';
+  previewPlaceholder.style.display = 'block';
+  previewPlaceholder.innerHTML = '<div class="p-5 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 正在從資料庫讀取現有排班...</div>';
 
   try {
     const result = await callAPI('getSchedule', { year, quarter });
+    
     if (result.status === 'success' && result.data.length > 0) {
-      container.innerHTML = ''; 
+      // 🎉 成功讀到資料，畫出表格！
       generatedScheduleData = result.data;
-      renderPreviewTable(generatedScheduleData);
+      renderPreviewTable(generatedScheduleData); 
     } else {
-      container.innerHTML = '<div class="alert alert-light text-center small">此季度目前無現有資料，請從上方選取日期開始排班。</div>';
+      // 找不到資料時的溫馨提示 (顯示在右邊)
+      previewPlaceholder.innerHTML = '<div class="alert alert-light text-center m-4">📋 本季度目前無現有排班，請從左方設定條件產生排班。</div>';
     }
   } catch (error) {
     console.error("讀取現有排班失敗:", error);
-    container.innerHTML = '<div class="alert alert-warning small">無法讀取現有資料</div>';
+    previewPlaceholder.innerHTML = '<div class="alert alert-danger text-center m-4">❌ 無法讀取現有資料，請檢查網路。</div>';
   }
 }
+
 
 function addSelectedDates() {
   if (!fpInstance?.selectedDates.length) { alert("請先點選日期"); return; }
