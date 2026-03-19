@@ -171,6 +171,34 @@ async function initScheduleTab() {
     let nameSet = new Set();
     currentPositions.forEach(pos => pos.personnel?.split(',').forEach(n => n.trim() && nameSet.add(n.trim())));
     uniquePersonnel = Array.from(nameSet).sort();
+    
+    // 🌟 關鍵：初始化完位置後，自動去讀取該季度的現有排班
+    loadExistingSchedule();
+  }
+}
+
+// 🌟 補回：讀取現有排班資料的函式
+async function loadExistingSchedule() {
+  const container = document.getElementById('dateSettingsContainer');
+  if (!container) return;
+  
+  const quarterSelect = document.getElementById('quarterSelect');
+  const [year, quarter] = quarterSelect.value.split('-');
+  
+  container.innerHTML = '<div class="text-center p-3"><div class="spinner-border spinner-border-sm"></div> 讀取現有資料中...</div>';
+
+  try {
+    const result = await callAPI('getSchedule', { year, quarter });
+    if (result.status === 'success' && result.data.length > 0) {
+      container.innerHTML = ''; 
+      generatedScheduleData = result.data;
+      renderPreviewTable(generatedScheduleData);
+    } else {
+      container.innerHTML = '<div class="alert alert-light text-center small">此季度目前無現有資料，請從上方選取日期開始排班。</div>';
+    }
+  } catch (error) {
+    console.error("讀取現有排班失敗:", error);
+    container.innerHTML = '<div class="alert alert-warning small">無法讀取現有資料</div>';
   }
 }
 
