@@ -163,84 +163,60 @@ async function savePositionsToServer() {
 // ==========================================
 // 3. 服事安排 (排班演算法與初始化)
 // ==========================================
+// ==========================================
+// 3. 服事安排 (初始化：只做準備，不主動抓資料)
+// ==========================================
 async function initScheduleTab() {
+  // 初始化日期選擇器
   if (!fpInstance) fpInstance = flatpickr("#multiDatePicker", { mode: "multiple", dateFormat: "Y-m-d", locale: "zh" });
   
+  // 抓取位置人員清單 (為了產生請假選單)
   const result = await callAPI('getPositions', {});
   if (result.status === 'success') {
     currentPositions = result.data;
     let nameSet = new Set();
-    currentPositions.forEach(pos => pos.personnel?.split(',').forEach(n => n.trim() && nameSet.add(n.trim())));
+    currentPositions.forEach(pos => (pos.personnel || '').split(',').forEach(n => n.trim() && nameSet.add(n.trim())));
     uniquePersonnel = Array.from(nameSet).sort();
-    
-    // 🌟 改變邏輯：不自動載入，而是給一個明確的操作面板
-    const placeholder = document.getElementById('previewPlaceholder');
-    const container = document.getElementById('previewContainer');
-    
-    if (container) container.style.display = 'none';
-    if (placeholder) {
-      placeholder.style.display = 'block';
-      placeholder.innerHTML = `
-        <div class="text-center p-5" style="border: 2px dashed #dee2e6; border-radius: 10px; background-color: #f8f9fa;">
-          <h5 class="text-secondary mb-4">📋 準備開始安排服事表</h5>
-          
-          <div class="d-flex flex-column align-items-center">
-            <div class="mb-3 text-start w-75">
-              <strong>✨ 方案 A：全新排班或新增日期</strong>
-              <p class="text-muted small mb-0">請直接從左方選取日期、設定請假人員，然後點擊左下的「產生排班表」。</p>
-            </div>
-            
-            <div class="text-muted mb-3">—— 或 ——</div>
-            
-            <div class="text-start w-75">
-              <strong>📝 方案 B：微調已發佈的班表</strong>
-              <p class="text-muted small mb-2">如果您只想修改本季度已經排好的某幾個人員，請點擊下方按鈕載入舊表：</p>
-              <button class="btn btn-outline-primary btn-sm w-100" onclick="loadExistingSchedule()">
-                🔄 載入本季現有排班表進行微調
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-    }
+  }
+
+  // 🌟 保持右邊清爽，等待操作
+  const placeholder = document.getElementById('previewPlaceholder');
+  const container = document.getElementById('previewContainer');
+  if (container) container.style.display = 'none';
+  if (placeholder) {
+    placeholder.style.display = 'block';
+    placeholder.innerHTML = '<div class="alert alert-light text-center m-4">請由左方「選取日期」後：<br>1. 點擊「產生排班」進行新排班<br>2. 或點擊「讀取現有班表」進行微調</div>';
   }
 }
-// 🌟 補回：讀取現有排班資料的函式
-// 🌟 完美定位版：正確讀取現有排班，且乖乖顯示在右側預覽區
+
+// ==========================================
+// 🌟 讀取現有班表 (只根據左側已選取的日期來抓資料)
+// ==========================================
 async function loadExistingSchedule() {
-  const previewPlaceholder = document.getElementById('previewPlaceholder');
-  const previewContainer = document.getElementById('previewContainer');
-  
-  if (!previewPlaceholder || !previewContainer) return;
-  
-  // 取得目前右上角選擇的季度 (例如 2026-Q2)
-  const quarterSelect = document.getElementById('quarterSelect');
-  if (!quarterSelect) return;
-  const [year, quarter] = quarterSelect.value.split('-');
-  
-  // 先把預覽表格藏起來，在右邊顯示讀取中的動畫
-  previewContainer.style.display = 'none';
-  previewPlaceholder.style.display = 'block';
-  previewPlaceholder.innerHTML = '<div class="p-5 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 正在從資料庫讀取現有排班...</div>';
+  const rows = document.querySelectorAll('#dateSettingsContainer .card');
+  let selectedDates = [];
+  rows.forEach(row => {
+    const d = row.querySelector('.s-date').value;
+    if (d) selectedDates.push(d);
+  });
+
+  if (selectedDates.length === 0) return alert("請先在左方「選取日期」並加入清單，我才知要讀哪幾天的資料喔！");
+
+  const placeholder = document.getElementById('previewPlaceholder');
+  placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 正在讀取選定日期的資料...</div>';
 
   try {
-    const result = await callAPI('getSchedule', { year, quarter });
+    // 🌟 這裡改呼叫 getScheduleByDateRange (確保只抓你選的那幾天)
+    const result = await callAPI('getScheduleByDateRange', { dates: selectedDates });
     
-    if (result.status === 'success' && result.data.length > 0) {
-      // 🎉 成功讀到資料，畫出表格！
+    if (result.status === 'success') {
       generatedScheduleData = result.data;
-      renderPreviewTable(generatedScheduleData); 
-    } else {
-      // 找不到資料時的溫馨提示 (顯示在右邊)
-      previewPlaceholder.innerHTML = '<div class="alert alert-light text-center m-4">📋 本季度目前無現有排班，請從左方設定條件產生排班。</div>';
+      renderPreviewTable(generatedScheduleData);
     }
   } catch (error) {
-    console.error("讀取現有排班失敗:", error);
-    previewPlaceholder.innerHTML = '<div class="alert alert-danger text-center m-4">❌ 無法讀取現有資料，請檢查網路。</div>';
+    alert("讀取失敗，請確認後端是否有 getScheduleByDateRange 函式");
   }
 }
-
-
 function addSelectedDates() {
   if (!fpInstance?.selectedDates.length) { alert("請先點選日期"); return; }
   fpInstance.selectedDates.sort((a, b) => a - b).forEach(dateObj => {
