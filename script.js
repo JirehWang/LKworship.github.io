@@ -265,35 +265,31 @@ async function loadScheduleByQuarter() {
 async function loadScheduleByDateRange() {
   const start = document.getElementById('queryStartDate').value;
   const end = document.getElementById('queryEndDate').value;
-  if (!start || !end) return alert("請先設定「功能 3」專屬的起訖日期");
-
-  let dateArray = [];
-  // 🌟 解析日期，確保不會因為時區少一天
-  let curr = parseDateSafe(start);
-  let stop = parseDateSafe(end);
-
-  while (curr <= stop) {
-    // 🌟 手動拼接標準 yyyy-mm-dd 字串
-    dateArray.push(formatDateSafe(curr));
-    curr.setDate(curr.getDate() + 1);
-  }
+  
+  if (!start || !end) return alert("請先設定起訖日期");
 
   const placeholder = document.getElementById('previewPlaceholder');
-  placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 撈取區間資料中...</div>';
+  placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 區間資料讀取中...</div>';
 
   try {
-    const result = await callAPI('getScheduleByDateRange', { dates: dateArray });
+    // 🌟 簡化：直接把 start 和 end 丟給後端，不用再跑 while 迴圈了
+    const result = await callAPI('getScheduleByDateRange', { 
+      startDate: start, 
+      endDate: end 
+    });
+    
     if (result.status === 'success' && result.data && result.data.length > 0) {
       generatedScheduleData = result.data;
       renderPreviewTable(generatedScheduleData);
     } else {
-      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間內目前無存檔資料。</div>`;
+      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間內無存檔資料，您可以開始新排班。</div>`;
       document.getElementById('previewContainer').style.display = 'none';
       document.getElementById('saveScheduleBtn').style.display = 'none';
     }
-  } catch (error) { alert("區間讀取失敗"); }
+  } catch (error) { 
+    alert("區間讀取失敗，請確認網路連線"); 
+  }
 }
-
 // --- 通用預覽渲染 ---
 function renderPreviewTable(data) {
   const thead = document.getElementById('previewThead'), tbody = document.getElementById('previewTbody');
