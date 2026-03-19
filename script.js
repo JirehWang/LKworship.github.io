@@ -1,4 +1,4 @@
-/* script.js - 敬拜團服事管理系統 (Pro 終極修正版 - 日期格式標準化) */
+/* script.js - 敬拜團服事管理系統 (Pro 終極修正版 - 日期對接優化) */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
@@ -19,9 +19,10 @@ window.onload = () => {
 };
 
 /**
- * 🌟 輔助工具：將日期物件轉為 yyyy-mm-dd 字串
+ * 🌟 核心工具 A：手動拼裝 yyyy-mm-dd (最穩定的格式)
  */
-function formatDateString(dateObj) {
+function formatDateSafe(dateObj) {
+  if (!dateObj || isNaN(dateObj.getTime())) return "";
   const y = dateObj.getFullYear();
   const m = String(dateObj.getMonth() + 1).padStart(2, '0');
   const d = String(dateObj.getDate()).padStart(2, '0');
@@ -29,11 +30,13 @@ function formatDateString(dateObj) {
 }
 
 /**
- * 🌟 輔助工具：安全解析 yyyy-mm-dd 字串為日期物件 (防止時區偏移)
+ * 🌟 核心工具 B：安全解析 yyyy-mm-dd 字串 (防止時區造成日期偏移)
  */
 function parseDateSafe(dateStr) {
+  if (!dateStr) return new Date();
   const parts = dateStr.split('-');
-  // new Date(year, monthIndex, day) 使用本地時間
+  if (parts.length !== 3) return new Date();
+  // 使用本地時間：new Date(year, monthIndex, day)
   return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
 }
 
@@ -161,7 +164,7 @@ function addPositionRow(posName, personnel, isRequired = "是") {
     <td class="text-center align-middle drag-handle" style="cursor: grab; color: #adb5bd;">☰</td>
     <td><input type="text" class="form-control form-control-sm pos-name text-center" value="${posName}" onclick="this.select()"></td>
     <td><input type="text" class="form-control form-control-sm pos-personnel" value="${personnel}" onclick="this.select()"></td>
-    <td><select class="form-select form-select-sm pos-required"><option value="是" ${isRequired === "開" ? "selected" : ""}>必排</option><option value="否" ${isRequired === "否" ? "selected" : ""}>非必排</option></select></td>
+    <td><select class="form-select form-select-sm pos-required"><option value="是" ${isRequired === "是" ? "selected" : ""}>必排</option><option value="否" ${isRequired === "否" ? "selected" : ""}>非必排</option></select></td>
     <td class="text-center"><button class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">x</button></td>
   `;
   tbody.appendChild(tr);
@@ -205,10 +208,10 @@ function generateSchedule() {
   const rows = document.querySelectorAll('#dateSettingsContainer .card');
   let inputConditions = [];
   rows.forEach(row => {
-    const date = row.querySelector('.s-date').value; // <input type="date"> 本身就是 yyyy-mm-dd
+    const date = row.querySelector('.s-date').value; 
     if (date) inputConditions.push({ date, type: row.querySelector('.s-type').value.trim(), leaves: row.querySelector('.s-leave').value.split(',').filter(x => x) });
   });
-  if (!inputConditions.length) return alert("請先從左方 Step 1 選取日期");
+  if (!inputConditions.length) return alert("請先從左方 Step 1 選取日期並按確認新增");
   inputConditions.sort((a, b) => a.date.localeCompare(b.date));
 
   let leaderPool = [], previousLeader = null, consecutive = {};
@@ -258,20 +261,20 @@ async function loadScheduleByQuarter() {
   } catch (error) { alert("讀取失敗"); }
 }
 
-// 功能 3：按區間日期讀取 (手動組裝 yyyy-mm-dd)
+// 功能 3：按區間日期讀取 (確保送出陣列完全匹配後端 toDateNum)
 async function loadScheduleByDateRange() {
   const start = document.getElementById('queryStartDate').value;
   const end = document.getElementById('queryEndDate').value;
-  if (!start || !end) return alert("請先設定起訖日期");
+  if (!start || !end) return alert("請先設定「功能 3」專屬的起訖日期");
 
   let dateArray = [];
-  // 🌟 使用解析工具，確保起始日期正確
+  // 🌟 解析日期，確保不會因為時區少一天
   let curr = parseDateSafe(start);
   let stop = parseDateSafe(end);
 
   while (curr <= stop) {
-    // 🌟 使用拼裝工具產出標準 yyyy-mm-dd
-    dateArray.push(formatDateString(curr));
+    // 🌟 手動拼接標準 yyyy-mm-dd 字串
+    dateArray.push(formatDateSafe(curr));
     curr.setDate(curr.getDate() + 1);
   }
 
@@ -280,11 +283,13 @@ async function loadScheduleByDateRange() {
 
   try {
     const result = await callAPI('getScheduleByDateRange', { dates: dateArray });
-    if (result.status === 'success' && result.data.length > 0) {
+    if (result.status === 'success' && result.data && result.data.length > 0) {
       generatedScheduleData = result.data;
       renderPreviewTable(generatedScheduleData);
     } else {
-      placeholder.innerHTML = `<div class="alert alert-info m-4">區間內目前無存檔資料。</div>`;
+      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間內目前無存檔資料。</div>`;
+      document.getElementById('previewContainer').style.display = 'none';
+      document.getElementById('saveScheduleBtn').style.display = 'none';
     }
   } catch (error) { alert("區間讀取失敗"); }
 }
@@ -345,8 +350,8 @@ async function saveGeneratedSchedule() {
 function addSelectedDates() {
   if (!fpInstance?.selectedDates.length) { alert("請先點選日期"); return; }
   fpInstance.selectedDates.sort((a, b) => a - b).forEach(dateObj => {
-    // 🌟 使用拼裝工具產出 yyyy-mm-dd
-    const dStr = formatDateString(dateObj);
+    // 🌟 確保新增到 Step 1 的日期也是標準格式
+    const dStr = formatDateSafe(dateObj);
     const div = document.createElement('div');
     div.className = 'card mb-2 p-2 border-primary border-opacity-25 shadow-sm';
     div.innerHTML = `
@@ -384,7 +389,7 @@ function confirmLeaveSelection() {
 }
 
 function getQuarter(dateString) { 
-  // 🌟 安全解析，避免跨日
+  // 🌟 使用解析工具，確保不會因為時區跑掉季度
   const d = parseDateSafe(dateString);
   return `Q${Math.floor((d.getMonth() + 3) / 3)}`; 
 }
@@ -446,7 +451,6 @@ async function smartProcessSermon() {
       result.data.forEach(item => {
         let rows = document.querySelectorAll('#sermonTbody tr'), isFound = false;
         for (let tr of rows) {
-          // 🌟 AI 回傳的日期應該也要是 yyyy-mm-dd
           if (tr.querySelector('.sermon-date').value === item.日期) {
             tr.querySelector('.sermon-pastor').value = item.牧師 || "";
             tr.querySelector('.sermon-title').value = item.題目 || "";
