@@ -1,9 +1,10 @@
+/* style.css - 敬拜團服事管理系統 (視覺優化版) */
+
 /* --- 基礎樣式 --- */
 body { 
     background-color: #f8f9fa; 
     font-family: "Microsoft JhengHei", sans-serif; 
     padding: 15px; 
-    /* 確保全域不會意外鎖死選取 */
     -webkit-text-size-adjust: 100%;
 }
 
@@ -20,33 +21,27 @@ body {
 /* 季度選擇區塊 */
 .quarter-box { background: #e9ecef; padding: 12px; border-radius: 8px; margin-bottom: 15px; }
 
-/* --- 📱 行動裝置複製貼上優化區 (核心解鎖) --- */
+/* --- 📱 行動裝置複製貼上優化區 --- */
 input, textarea, select {
-    /* 1. 防止 iOS/Android 在字體小於 16px 時自動放大畫面 */
     font-size: 16px !important; 
-    /* 2. 強制解鎖選取與貼上功能 */
     user-select: text !important;
     -webkit-user-select: text !important;
     -moz-user-select: text !important;
-    /* 3. 優化觸控反應 */
     -webkit-tap-highlight-color: rgba(0,0,0,0);
     touch-action: manipulation;
 }
 
-/* 針對表格內的輸入框加強 */
 .modern-table input, .table input, .form-control {
     padding: 8px 5px !important;
     cursor: text;
 }
 
-/* 徹底解鎖表格內的長按選單 */
 .modern-table td, .table td, .table tr {
-    -webkit-touch-callout: default !important; /* 恢復系統長按選單 */
+    -webkit-touch-callout: default !important;
     user-select: text !important;
     -webkit-user-select: text !important;
 }
 
-/* 唯獨拖移把手保持不可選取，以免拖動時變選取文字 */
 .drag-handle {
     user-select: none !important;
     -webkit-user-select: none !important;
@@ -56,7 +51,6 @@ input, textarea, select {
 .table-scroll-container { 
     background: white; border-radius: 8px; overflow-x: auto; 
     border: 1px solid #dee2e6; position: relative; 
-    /* 平滑滾動 */
     -webkit-overflow-scrolling: touch;
 }
 
@@ -70,22 +64,36 @@ input, textarea, select {
     padding: 15px 10px; white-space: nowrap; position: sticky; top: 0; z-index: 10; 
 }
 
-/* 單元格與文字折行 */
+/* 單元格通用樣式 */
 .modern-table td, .bulletin-table td { 
     vertical-align: middle; text-align: center; padding: 12px 10px; border-bottom: 1px solid #eee;
-    max-width: 180px; white-space: normal !important; word-break: break-all; line-height: 1.5; font-size: 1rem;
+    max-width: 180px; white-space: normal; word-break: break-all; line-height: 1.5; font-size: 1rem;
 }
 
-/* 凍結前兩欄（日期與類別） */
+/* 🌟 修正：凍結第一欄（日期）- 縮小寬度、強制不換行 */
 .modern-table th:nth-child(1), .modern-table td:nth-child(1),
 .bulletin-table th:nth-child(1), .bulletin-table td:nth-child(1) { 
-    position: sticky; left: 0; width: 110px; z-index: 5; background-color: #fff; 
+    position: sticky; 
+    left: 0; 
+    width: 100px;           /* 修正為 100px */
+    z-index: 5; 
+    background-color: #fff; 
+    white-space: nowrap !important; /* 🌟 核心修正：強制日期不換行 */
+    padding-left: 5px !important;   /* 壓縮內邊距 */
+    padding-right: 5px !important;
+    font-size: 0.9rem;              /* 字體微縮 */
 }
 
+/* 🌟 修正：凍結第二欄（聚會類別）- 校正 left 位置 */
 .modern-table th:nth-child(2), .modern-table td:nth-child(2),
 .bulletin-table th:nth-child(2), .bulletin-table td:nth-child(2) { 
-    position: sticky; left: 110px; width: 100px; z-index: 5; background-color: #fff; 
+    position: sticky; 
+    left: 100px;           /* 🌟 必須與第一欄 width 同步 */
+    width: 90px; 
+    z-index: 5; 
+    background-color: #fff; 
     box-shadow: 2px 0 5px rgba(0,0,0,0.05); 
+    white-space: nowrap !important; /* 聚會類別也不換行 */
 }
 
 /* 確保凍結的表頭在最上層 */
@@ -96,7 +104,7 @@ input, textarea, select {
 
 /* --- 狀態與特效 --- */
 .warning-row { background-color: #fff9db !important; }
-.warning-text, .warning-label { color: #d97706; font-size: 0.8em; font-weight: bold; display: block; }
+.warning-text, .warning-label { color: #d97706; font-size: 0.75rem; font-weight: bold; display: block; margin-top: 2px; }
 .select-danger { background-color: #ffebee !important; color: #c62828 !important; font-weight: bold; border-color: #ef5350 !important; }
 
 /* 聚會類別標示 */
