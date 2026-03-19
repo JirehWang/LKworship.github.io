@@ -218,49 +218,59 @@ function generateSchedule() {
 }
 
 // 功能 2：按「季度」查詢已排好的服事表
+// ==========================================
+// 功能 2：按「後台專屬選單」查詢季度班表
+// ==========================================
 async function loadScheduleByQuarter() {
-  const quarterSelect = document.getElementById('quarterSelect');
-  const [year, quarter] = quarterSelect.value.split('-');
+  // 🌟 修改點：改讀取 editQuarterSelect 而不是 Dashboard 的選單
+  const select = document.getElementById('editQuarterSelect');
+  const [year, quarter] = select.value.split('-');
+
   const placeholder = document.getElementById('previewPlaceholder');
-  
-  placeholder.innerHTML = `<div class="p-4 text-success"><div class="spinner-border spinner-border-sm"></div> 正在抓取 ${year} ${quarter} 資料...</div>`;
-  
+  placeholder.innerHTML = `<div class="p-4 text-center text-success"><div class="spinner-border spinner-border-sm"></div> 抓取 ${year} ${quarter} 資料...</div>`;
+
   try {
     const result = await callAPI('getSchedule', { year, quarter });
     if (result.status === 'success' && result.data.length > 0) {
       generatedScheduleData = result.data;
       renderPreviewTable(generatedScheduleData);
     } else {
-      placeholder.innerHTML = `<div class="alert alert-warning m-4">資料庫查無 ${year} ${quarter} 的班表。</div>`;
+      placeholder.innerHTML = `<div class="alert alert-warning m-4">資料庫中查無 ${year} ${quarter} 的班表。</div>`;
     }
   } catch (error) { alert("讀取季度班表失敗"); }
 }
 
-// 功能 3：按「左側選取的日期區間」進行查詢修改
-async function loadScheduleBySelectedDates() {
-  const rows = document.querySelectorAll('#dateSettingsContainer .card');
-  let selectedDates = [];
-  rows.forEach(row => {
-    const d = row.querySelector('.s-date').value;
-    if (d) selectedDates.push(d);
-  });
+// ==========================================
+// 功能 3：按「專屬區間日期」進行查詢修改
+// ==========================================
+async function loadScheduleByDateRange() {
+  const start = document.getElementById('queryStartDate').value;
+  const end = document.getElementById('queryEndDate').value;
 
-  if (selectedDates.length === 0) return alert("請先從左側小日曆選擇日期並「確認新增」到清單中。");
+  if (!start || !end) return alert("請先設定查詢的起訖日期");
+
+  // 生成區間內的所有日期陣列 (後端 getScheduleByDateRange 是接收陣列)
+  let dateArray = [];
+  let curr = new Date(start);
+  let stop = new Date(end);
+  while (curr <= stop) {
+    dateArray.push(new Date(curr).toISOString().split('T')[0]);
+    curr.setDate(curr.getDate() + 1);
+  }
 
   const placeholder = document.getElementById('previewPlaceholder');
-  placeholder.innerHTML = '<div class="p-4 text-primary"><div class="spinner-border spinner-border-sm"></div> 正在讀取選定日期的資料...</div>';
+  placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 正在讀取區間資料...</div>';
 
   try {
-    const result = await callAPI('getScheduleByDateRange', { dates: selectedDates });
+    const result = await callAPI('getScheduleByDateRange', { dates: dateArray });
     if (result.status === 'success' && result.data.length > 0) {
       generatedScheduleData = result.data;
       renderPreviewTable(generatedScheduleData);
     } else {
-      placeholder.innerHTML = '<div class="alert alert-info m-4">選取的日期區間目前無現有資料。</div>';
+      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間無現有資料。</div>`;
     }
-  } catch (error) { alert("讀取指定日期班表失敗"); }
+  } catch (error) { alert("讀取區間班表失敗"); }
 }
-
 // --- 通用預覽與儲存功能 ---
 function renderPreviewTable(data) {
   const thead = document.getElementById('previewThead'), tbody = document.getElementById('previewTbody');
