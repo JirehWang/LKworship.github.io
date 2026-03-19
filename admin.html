@@ -95,18 +95,16 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5 class="fw-bold">📖 牧師、題目與經文快速登錄</h5>
       <div>
-        <button class="btn btn-primary fw-bold px-3 me-2" onclick="aiParseSermon()" id="aiBtn">✨ AI 智慧解析</button>
+        <button class="btn btn-primary fw-bold px-3 me-2" onclick="smartProcessSermon()" id="aiBtn">✨ 智慧處理 (Excel / AI)</button>
         <button class="btn btn-success fw-bold px-4" onclick="saveSermonData()">儲存至資料庫</button>
       </div>
     </div>
     
     <div class="alert alert-info shadow-sm border-0 small">
-      💡 <strong>兩種輸入方式：</strong><br>
-      1. <strong>貼上 Excel：</strong>複製 Excel 內容貼上，系統瞬間轉為表格！<br>
-      2. <strong>AI 智慧解析：</strong>貼上牧師傳來的 Line 訊息（無固定格式），點擊上方「AI 智慧解析」按鈕自動抓取。
+      💡 <strong>無痛貼上：</strong>不管是在手機還是電腦，直接把 <strong>Excel 表格</strong> 或長篇 <strong>Line 訊息</strong> 整坨貼進來，點擊上方「智慧處理」按鈕，系統會自動判斷！
     </div>
 
-    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light shadow-sm" rows="5" placeholder="📋 在此貼上 Excel 資料，或要讓 AI 解析的訊息內容..." onpaste="handleSermonPaste(event)"></textarea>
+    <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light shadow-sm" rows="8" placeholder="📋 點此貼上文字，不限行數..."></textarea>
     
     <div class="table-responsive bg-white rounded-3 shadow-sm border mb-3">
       <table class="table table-hover mb-0 align-middle">
