@@ -161,10 +161,11 @@ async function savePositionsToServer() {
 }
 
 // ==========================================
-// 3. 服事安排 (排班演算法)
+// 3. 服事安排 (排班演算法與初始化)
 // ==========================================
 async function initScheduleTab() {
   if (!fpInstance) fpInstance = flatpickr("#multiDatePicker", { mode: "multiple", dateFormat: "Y-m-d", locale: "zh" });
+  
   const result = await callAPI('getPositions', {});
   if (result.status === 'success') {
     currentPositions = result.data;
@@ -172,11 +173,38 @@ async function initScheduleTab() {
     currentPositions.forEach(pos => pos.personnel?.split(',').forEach(n => n.trim() && nameSet.add(n.trim())));
     uniquePersonnel = Array.from(nameSet).sort();
     
-    // 🌟 關鍵：初始化完位置後，自動去讀取該季度的現有排班
-    loadExistingSchedule();
+    // 🌟 改變邏輯：不自動載入，而是給一個明確的操作面板
+    const placeholder = document.getElementById('previewPlaceholder');
+    const container = document.getElementById('previewContainer');
+    
+    if (container) container.style.display = 'none';
+    if (placeholder) {
+      placeholder.style.display = 'block';
+      placeholder.innerHTML = `
+        <div class="text-center p-5" style="border: 2px dashed #dee2e6; border-radius: 10px; background-color: #f8f9fa;">
+          <h5 class="text-secondary mb-4">📋 準備開始安排服事表</h5>
+          
+          <div class="d-flex flex-column align-items-center">
+            <div class="mb-3 text-start w-75">
+              <strong>✨ 方案 A：全新排班或新增日期</strong>
+              <p class="text-muted small mb-0">請直接從左方選取日期、設定請假人員，然後點擊左下的「產生排班表」。</p>
+            </div>
+            
+            <div class="text-muted mb-3">—— 或 ——</div>
+            
+            <div class="text-start w-75">
+              <strong>📝 方案 B：微調已發佈的班表</strong>
+              <p class="text-muted small mb-2">如果您只想修改本季度已經排好的某幾個人員，請點擊下方按鈕載入舊表：</p>
+              <button class="btn btn-outline-primary btn-sm w-100" onclick="loadExistingSchedule()">
+                🔄 載入本季現有排班表進行微調
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
   }
 }
-
 // 🌟 補回：讀取現有排班資料的函式
 // 🌟 完美定位版：正確讀取現有排班，且乖乖顯示在右側預覽區
 async function loadExistingSchedule() {
