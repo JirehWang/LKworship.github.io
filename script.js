@@ -1,10 +1,7 @@
 /* script.js - 敬拜團服事管理系統 (Pro 終極修正版 - 日期對接優化) */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
-const result = await callAPI('getScheduleByDateRange', { 
-  startDate: start, 
-  endDate: end 
-});
+
 
 // 🔍 加這行
 console.log('DEBUG:', JSON.stringify(result.debug, null, 2));
@@ -279,22 +276,25 @@ async function loadScheduleByDateRange() {
   placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 區間資料讀取中...</div>';
 
   try {
-    // 🌟 簡化：直接把 start 和 end 丟給後端，不用再跑 while 迴圈了
     const result = await callAPI('getScheduleByDateRange', { 
       startDate: start, 
       endDate: end 
     });
-    
+
+    // 🔍 DEBUG：把後端回傳的完整資訊顯示出來
+    console.log('DEBUG result:', result);
+    alert("【DEBUG 後端回傳】\n" + JSON.stringify(result.debug, null, 2));
+
     if (result.status === 'success' && result.data && result.data.length > 0) {
       generatedScheduleData = result.data;
       renderPreviewTable(generatedScheduleData);
     } else {
-      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間內無存檔資料，您可以開始新排班。</div>`;
+      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間內無存檔資料。</div>`;
       document.getElementById('previewContainer').style.display = 'none';
       document.getElementById('saveScheduleBtn').style.display = 'none';
     }
   } catch (error) { 
-    alert("區間讀取失敗，請確認網路連線"); 
+    alert("區間讀取失敗：" + error.message); 
   }
 }
 // --- 通用預覽渲染 ---
