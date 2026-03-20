@@ -9,7 +9,6 @@ let fpInstance = null;
 let uniquePersonnel = []; 
 let currentLeaveCard = null; 
 let sortablePositions = null; 
-let currentAbortController = null;
 
 // --- 初始化 ---
 window.onload = () => {
