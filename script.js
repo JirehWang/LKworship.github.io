@@ -2,10 +2,6 @@
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
-
-// 🔍 加這行
-console.log('DEBUG:', JSON.stringify(result.debug, null, 2));
-alert(JSON.stringify(result.debug, null, 2)); // 直接彈窗看結果
 // --- 全域變數 ---
 let currentPositions = []; 
 let generatedScheduleData = []; 
