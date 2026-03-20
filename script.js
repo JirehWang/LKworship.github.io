@@ -87,9 +87,7 @@ async function loadDashboard() {
   const [year, quarter] = quarterSelect.value.split('-');
   container.innerHTML = `<div class="text-center p-5 text-primary"><div class="spinner-border"></div><div class="mt-2">同步 ${year}-${quarter} 資料中...</div></div>`;
 
-  if (currentAbortController) currentAbortController.abort();
-  currentAbortController = new AbortController();
-
+  // ✅ 移除 AbortController，手機上容易自己取消自己
   try {
     const result = await callAPI('getSchedule', { year, quarter });
     if (result.status === 'success') {
@@ -100,9 +98,12 @@ async function loadDashboard() {
       container.innerHTML = `<div class="alert alert-warning text-center m-4">⚠️ ${result.message || '查無資料'}</div>`;
     }
   } catch (error) {
-    if (error.name !== 'AbortError') {
-      container.innerHTML = `<div class="alert alert-danger text-center m-4">❌ 連線失敗，請檢查 API 部署狀態</div>`;
-    }
+    container.innerHTML = `
+      <div class="alert alert-danger text-center m-4">
+        ❌ 連線失敗<br>
+        <small>${error.message}</small>
+      </div>
+    `;
   }
 }
 
