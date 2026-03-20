@@ -281,22 +281,21 @@ async function loadScheduleByDateRange() {
       endDate: end 
     });
 
-    // 🔍 DEBUG：把後端回傳的完整資訊顯示出來
-    console.log('DEBUG result:', result);
-    alert("【DEBUG 後端回傳】\n" + JSON.stringify(result.debug, null, 2));
+    // 🔍 DEBUG：直接印在畫面上
+    placeholder.innerHTML = `
+      <div class="alert alert-warning m-3">
+        <strong>DEBUG 後端回傳：</strong>
+        <pre style="font-size:11px; white-space:pre-wrap; word-break:break-all;">
+${JSON.stringify(result, null, 2)}
+        </pre>
+      </div>
+    `;
 
-    if (result.status === 'success' && result.data && result.data.length > 0) {
-      generatedScheduleData = result.data;
-      renderPreviewTable(generatedScheduleData);
-    } else {
-      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間內無存檔資料。</div>`;
-      document.getElementById('previewContainer').style.display = 'none';
-      document.getElementById('saveScheduleBtn').style.display = 'none';
-    }
   } catch (error) { 
-    alert("區間讀取失敗：" + error.message); 
+    placeholder.innerHTML = `<div class="alert alert-danger m-3">錯誤：${error.message}</div>`;
   }
 }
+
 // --- 通用預覽渲染 ---
 function renderPreviewTable(data) {
   const thead = document.getElementById('previewThead'), tbody = document.getElementById('previewTbody');
