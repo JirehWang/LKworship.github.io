@@ -271,28 +271,24 @@ async function loadScheduleByDateRange() {
   const end = document.getElementById('queryEndDate').value;
   
   if (!start || !end) return alert("請先設定起訖日期");
-
   const placeholder = document.getElementById('previewPlaceholder');
   placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 區間資料讀取中...</div>';
-
   try {
     const result = await callAPI('getScheduleByDateRange', { 
       startDate: start, 
       endDate: end 
     });
-
-    // 🔍 DEBUG：直接印在畫面上
-    placeholder.innerHTML = `
-      <div class="alert alert-warning m-3">
-        <strong>DEBUG 後端回傳：</strong>
-        <pre style="font-size:11px; white-space:pre-wrap; word-break:break-all;">
-${JSON.stringify(result, null, 2)}
-        </pre>
-      </div>
-    `;
-
+    
+    if (result.status === 'success' && result.data && result.data.length > 0) {
+      generatedScheduleData = result.data;
+      renderPreviewTable(generatedScheduleData);
+    } else {
+      placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 區間內無存檔資料，您可以開始新排班。</div>`;
+      document.getElementById('previewContainer').style.display = 'none';
+      document.getElementById('saveScheduleBtn').style.display = 'none';
+    }
   } catch (error) { 
-    placeholder.innerHTML = `<div class="alert alert-danger m-3">錯誤：${error.message}</div>`;
+    alert("區間讀取失敗，請確認網路連線"); 
   }
 }
 
