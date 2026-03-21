@@ -1,4 +1,4 @@
-/* script.js - 敬拜團服事管理系統 (Pro 終極修正版 - 日期對接優化) */
+/* script.js - 敬拜團服事管理系統 (Pro 終極修正版 - 日期對接優化 + 講道區間過濾) */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
@@ -393,16 +393,42 @@ function getQuarter(dateString) {
 // ==========================================
 let deletedSermonUUIDs = [];
 
+// 🌟 講道登錄：讀取資料 (支援區間過濾)
 async function loadSermonData() {
+  // 抓取畫面上設定的起訖日期
+  const startInput = document.getElementById('sermonStartDate');
+  const endInput = document.getElementById('sermonEndDate');
+  
+  const start = startInput ? startInput.value : '';
+  const end = endInput ? endInput.value : '';
+
+  // 防呆：如果有輸入框，但只填了單邊
+  if ((start && !end) || (!start && end)) {
+    return alert("請完整設定起訖日期，或是清空兩者以讀取全部資料。");
+  }
+
   deletedSermonUUIDs = []; 
   const tbody = document.getElementById('sermonTbody');
+  
+  // 加入讀取中的動畫體驗
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center text-primary py-4"><div class="spinner-border spinner-border-sm"></div> 講道資料讀取中...</td></tr>';
+
   try {
-    const result = await callAPI('getSermonInfo', {});
+    // 將日期打包成 payload 送給後端 (若皆為空則送空物件，後端自動判斷全表撈取)
+    const payload = (start && end) ? { startDate: start, endDate: end } : {};
+    const result = await callAPI('getSermonInfo', payload);
+    
     tbody.innerHTML = '';
-    if (result.status === 'success' && result.data.length) {
+    
+    if (result.status === 'success' && result.data && result.data.length > 0) {
       result.data.forEach(r => addSermonRow(r.UUID, r.日期, r.聚會類別, r.牧師, r.題目, r.經文));
-    } else { addSermonRow('', '', '主日', '', '', ''); }
-  } catch (error) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">讀取失敗</td></tr>'; }
+    } else {
+      // 查無資料時，預設給一個乾淨的空白行
+      addSermonRow('', '', '主日', '', '', ''); 
+    }
+  } catch (error) { 
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">❌ 讀取失敗，請確認網路狀態</td></tr>'; 
+  }
 }
 
 function addSermonRow(uuid, date, type, pastor, title, scripture) {
