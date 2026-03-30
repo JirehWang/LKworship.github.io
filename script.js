@@ -1,4 +1,4 @@
-/* script.js - 敬拜團服事管理系統 (Pro 終極修正版 - 日期對接優化 + 講道區間過濾) */
+/* script.js - 敬拜團服事管理系統 (Pro 終極修正版 - 加入聚會名稱對接) */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
@@ -86,7 +86,6 @@ async function loadDashboard() {
   const [year, quarter] = quarterSelect.value.split('-');
   container.innerHTML = `<div class="text-center p-5 text-primary"><div class="spinner-border"></div><div class="mt-2">同步 ${year}-${quarter} 資料中...</div></div>`;
 
-  // ✅ 移除 AbortController，手機上容易自己取消自己
   try {
     const result = await callAPI('getSchedule', { year, quarter });
     if (result.status === 'success') {
@@ -112,7 +111,8 @@ function renderDashboardTable(data) {
     container.innerHTML = '<div class="alert alert-light text-center m-4">📋 本季度暫無排班資料。</div>';
     return;
   }
-  const fixedHeaders = ['日期', '聚會類別', '牧師', '題目', '經文'];
+  // 🌟 修改：加入 '聚會名稱'
+  const fixedHeaders = ['日期', '聚會名稱', '聚會類別', '牧師', '題目', '經文'];
   const allKeys = Object.keys(data[0]);
   const dynamicHeaders = allKeys.filter(k => !fixedHeaders.includes(k) && !['hasWarning', 'warningMessage', '年度', '季度'].includes(k));
   const finalHeaders = [...fixedHeaders, ...dynamicHeaders];
@@ -219,7 +219,8 @@ function generateSchedule() {
   generatedScheduleData = [];
 
   inputConditions.forEach(day => {
-    let daily = { '年度': day.date.substring(0,4), '季度': getQuarter(day.date), '日期': day.date, '聚會類別': day.type }, assigned = [];
+    // 🌟 修改：加入 '聚會名稱': '' 作為預設值
+    let daily = { '年度': day.date.substring(0,4), '季度': getQuarter(day.date), '日期': day.date, '聚會名稱': '', '聚會類別': day.type }, assigned = [];
     currentPositions.forEach(pos => {
       let name = pos.positionName;
       let candidates = (pos.personnel || '').split(',').map(s => s.trim()).filter(x => x);
@@ -294,7 +295,8 @@ function renderPreviewTable(data) {
   thead.innerHTML = ''; tbody.innerHTML = '';
   if (!data.length) return;
 
-  let headers = ['日期', '聚會類別', ...currentPositions.map(p => p.positionName)];
+  // 🌟 修改：表頭陣列加入 '聚會名稱'
+  let headers = ['日期', '聚會名稱', '聚會類別', ...currentPositions.map(p => p.positionName)];
   let trH = document.createElement('tr');
   headers.forEach(h => { let th = document.createElement('th'); th.innerText = h; trH.appendChild(th); });
   thead.appendChild(trH);
@@ -303,11 +305,22 @@ function renderPreviewTable(data) {
     let tr = document.createElement('tr');
     headers.forEach(h => {
       let td = document.createElement('td');
-      if (h === '日期') td.innerHTML = `<span class="badge bg-secondary">${row[h]}</span>`;
+      if (h === '日期') {
+        td.innerHTML = `<span class="badge bg-secondary">${row[h]}</span>`;
+      } 
+      // 🌟 新增：處理 '聚會名稱' 渲染
+      else if (h === '聚會名稱') {
+        let input = document.createElement('input'); 
+        input.className = 'form-control form-control-sm text-center border-0 bg-transparent fw-bold text-success';
+        input.value = row[h] || ''; 
+        input.onclick = function() { this.select(); };
+        input.onchange = (e) => generatedScheduleData[idx][h] = e.target.value.trim();
+        td.appendChild(input);
+      } 
       else if (h === '聚會類別') {
         let input = document.createElement('input'); 
         input.className = 'form-control form-control-sm text-center border-0 bg-transparent fw-bold text-primary';
-        input.value = row[h]; 
+        input.value = row[h] || ''; 
         input.onclick = function() { this.select(); };
         input.onchange = (e) => generatedScheduleData[idx][h] = e.target.value.trim();
         td.appendChild(input);
