@@ -1,4 +1,4 @@
-/* script.js - 敬拜團服事管理系統 (Pro 終極修正版 - 加入聚會名稱對接) */
+/* script.js - 敬拜團服事管理系統 (Pro 終極修正版 - 講道對接外部日期框架) */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
@@ -262,7 +262,7 @@ async function loadScheduleByQuarter() {
   } catch (error) { alert("讀取失敗"); }
 }
 
-// 功能 3：按區間日期讀取 (確保送出陣列完全匹配後端 toDateNum)
+// 功能 3：按區間日期讀取
 async function loadScheduleByDateRange() {
   const start = document.getElementById('queryStartDate').value;
   const end = document.getElementById('queryEndDate').value;
@@ -406,16 +406,14 @@ function getQuarter(dateString) {
 // ==========================================
 let deletedSermonUUIDs = [];
 
-// 🌟 講道登錄：讀取資料 (支援區間過濾)
+// 🌟 講道登錄：讀取資料 (從外部日曆同步框架)
 async function loadSermonData() {
-  // 抓取畫面上設定的起訖日期
   const startInput = document.getElementById('sermonStartDate');
   const endInput = document.getElementById('sermonEndDate');
   
   const start = startInput ? startInput.value : '';
   const end = endInput ? endInput.value : '';
 
-  // 防呆：如果有輸入框，但只填了單邊
   if ((start && !end) || (!start && end)) {
     return alert("請完整設定起訖日期，或是清空兩者以讀取全部資料。");
   }
@@ -423,50 +421,46 @@ async function loadSermonData() {
   deletedSermonUUIDs = []; 
   const tbody = document.getElementById('sermonTbody');
   
-  // 加入讀取中的動畫體驗
-  tbody.innerHTML = '<tr><td colspan="6" class="text-center text-primary py-4"><div class="spinner-border spinner-border-sm"></div> 講道資料讀取中...</td></tr>';
+  // 讀取動畫 (6欄位)
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center text-primary py-4"><div class="spinner-border spinner-border-sm"></div> 從外部日曆同步框架中...</td></tr>';
 
   try {
-    // 將日期打包成 payload 送給後端 (若皆為空則送空物件，後端自動判斷全表撈取)
     const payload = (start && end) ? { startDate: start, endDate: end } : {};
     const result = await callAPI('getSermonInfo', payload);
     
     tbody.innerHTML = '';
     
     if (result.status === 'success' && result.data && result.data.length > 0) {
-      result.data.forEach(r => addSermonRow(r.UUID, r.日期, r.聚會類別, r.牧師, r.題目, r.經文));
+      // 🌟 帶入聚會名稱，且由外部日曆決定行數
+      result.data.forEach(r => addSermonRow(r.UUID, r.日期, r.聚會名稱, r.聚會類別, r.牧師, r.題目, r.經文));
     } else {
-      // 查無資料時，預設給一個乾淨的空白行
-      addSermonRow('', '', '主日', '', '', ''); 
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">此區間內在「聚會資料表」中沒有安排聚會。</td></tr>'; 
     }
   } catch (error) { 
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">❌ 讀取失敗，請確認網路狀態</td></tr>'; 
   }
 }
 
-function addSermonRow(uuid, date, type, pastor, title, scripture) {
+// 🌟 修改：加入聚會名稱，並將日期與類別設為「唯讀(readonly)」
+function addSermonRow(uuid, date, name, type, pastor, title, scripture) {
   const rowId = uuid || 'uuid-' + Math.random().toString(36).substr(2, 9);
   const tbody = document.getElementById('sermonTbody');
   const tr = document.createElement('tr');
+  
+  // 移除手動刪除整行的按鈕，因為行數是由外部日曆決定的
   tr.innerHTML = `
     <input type="hidden" class="sermon-uuid" value="${rowId}">
-    <td><input type="date" class="form-control form-control-sm sermon-date" value="${date}"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-type text-center text-primary fw-bold" value="${type || '主日'}" onclick="this.select()"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-pastor text-center" value="${pastor}" onclick="this.select()"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-title" value="${title}" onclick="this.select()" placeholder="題目"></td>
-    <td><input type="text" class="form-control form-control-sm sermon-scripture" value="${scripture}" onclick="this.select()" placeholder="經文"></td>
-    <td class="text-center align-middle"><button class="btn btn-sm btn-outline-danger" onclick="removeSermonRow(this)">x</button></td>
+    <td style="width: 15%;"><input type="date" class="form-control form-control-sm sermon-date border-0 bg-transparent fw-bold text-secondary" value="${date}" readonly></td>
+    <td style="width: 15%;"><input type="text" class="form-control form-control-sm sermon-name border-0 bg-transparent text-success fw-bold text-center" value="${name || ''}" readonly placeholder="聚會名稱"></td>
+    <td style="width: 10%;"><input type="text" class="form-control form-control-sm sermon-type border-0 bg-transparent text-primary fw-bold text-center" value="${type || '主日'}" readonly></td>
+    <td style="width: 15%;"><input type="text" class="form-control form-control-sm sermon-pastor text-center bg-white shadow-sm" value="${pastor}" onclick="this.select()" placeholder="牧師"></td>
+    <td style="width: 20%;"><input type="text" class="form-control form-control-sm sermon-title bg-white shadow-sm" value="${title}" onclick="this.select()" placeholder="題目"></td>
+    <td style="width: 25%;"><input type="text" class="form-control form-control-sm sermon-scripture bg-white shadow-sm" value="${scripture}" onclick="this.select()" placeholder="經文"></td>
   `;
   tbody.appendChild(tr);
 }
 
-function removeSermonRow(btn) {
-  const tr = btn.closest('tr');
-  const uuid = tr.querySelector('.sermon-uuid').value;
-  if (uuid && !uuid.startsWith('uuid-')) deletedSermonUUIDs.push(uuid);
-  tr.remove();
-}
-
+// 🌟 智慧處理：AI 填空邏輯優化 (對準已存在的唯讀日期框架)
 async function smartProcessSermon() {
   const textArea = document.getElementById('sermonPasteArea');
   const text = textArea.value.trim();
@@ -474,24 +468,29 @@ async function smartProcessSermon() {
   if (!text) return alert("請貼入文字！");
 
   btn.disabled = true; let sec = 0;
-  btn.innerHTML = `AI 分析中... (${sec}s)`;
-  const timer = setInterval(() => { sec++; btn.innerHTML = `AI 分析中... (${sec}s)`; }, 1000);
+  btn.innerHTML = `AI 分析比對中... (${sec}s)`;
+  const timer = setInterval(() => { sec++; btn.innerHTML = `AI 分析比對中... (${sec}s)`; }, 1000);
 
   try {
     const result = await callAPI('parseSermonWithAI', { text: text });
     clearInterval(timer);
     if (result.status === 'success' && Array.isArray(result.data)) {
       result.data.forEach(item => {
-        let rows = document.querySelectorAll('#sermonTbody tr'), isFound = false;
+        let rows = document.querySelectorAll('#sermonTbody tr');
         for (let tr of rows) {
-          if (tr.querySelector('.sermon-date').value === item.日期) {
+          const rowDate = tr.querySelector('.sermon-date').value;
+          const rowType = tr.querySelector('.sermon-type').value;
+          // 比對日期，並交叉比對類別，確保不填錯場次
+          if (rowDate === item.日期 && (!item.聚會類別 || rowType.includes(item.聚會類別) || item.聚會類別.includes(rowType))) {
             tr.querySelector('.sermon-pastor').value = item.牧師 || "";
             tr.querySelector('.sermon-title').value = item.題目 || "";
             tr.querySelector('.sermon-scripture').value = item.經文 || "";
-            isFound = true; break;
+            // 加入填寫成功的視覺提示
+            tr.classList.add('table-success');
+            setTimeout(() => tr.classList.remove('table-success'), 2000);
+            break;
           }
         }
-        if (!isFound) addSermonRow('', item.日期, item.聚會類別, item.牧師, item.題目, item.經文);
       });
       textArea.value = ""; 
     }
@@ -503,10 +502,15 @@ async function saveSermonData() {
   let finalSermonData = [];
   document.querySelectorAll('#sermonTbody tr').forEach(tr => {
     let date = tr.querySelector('.sermon-date').value;
-    if (date) {
+    // 只有當「牧師」或「題目」有填寫時，才存回資料庫，保持乾淨
+    if (date && (tr.querySelector('.sermon-pastor').value.trim() || tr.querySelector('.sermon-title').value.trim())) {
       finalSermonData.push({
-        'UUID': tr.querySelector('.sermon-uuid').value, '日期': date, '聚會類別': tr.querySelector('.sermon-type').value.trim(),
-        '牧師': tr.querySelector('.sermon-pastor').value.trim(), '題目': tr.querySelector('.sermon-title').value.trim(), '經文': tr.querySelector('.sermon-scripture').value.trim()
+        'UUID': tr.querySelector('.sermon-uuid').value, 
+        '日期': date, 
+        '聚會類別': tr.querySelector('.sermon-type').value.trim(),
+        '牧師': tr.querySelector('.sermon-pastor').value.trim(), 
+        '題目': tr.querySelector('.sermon-title').value.trim(), 
+        '經文': tr.querySelector('.sermon-scripture').value.trim()
       });
     }
   });
@@ -514,7 +518,9 @@ async function saveSermonData() {
   btn.disabled = true; btn.innerText = "儲存中...";
   try {
     await callAPI('saveSermonInfo', { sermonData: finalSermonData, deletedUUIDs: deletedSermonUUIDs });
-    alert("✅ 講員資訊儲存成功！"); loadDashboard(); switchTab('dashboard');
+    alert("✅ 講道資訊成功填寫並儲存！"); 
+    loadDashboard(); 
+    switchTab('dashboard');
   } catch(error) { alert("儲存失敗"); }
   finally { btn.disabled = false; btn.innerText = "儲存至資料庫"; }
 }
