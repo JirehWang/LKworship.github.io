@@ -183,8 +183,15 @@ async function initScheduleTab() {
 async function loadScheduleByQuarter() {
   const select = document.getElementById('editQuarterSelect');
   const [year, quarter] = select.value.split('-');
+  
+  // 🌟 修正：先隱藏舊表格，強制顯示讀取動畫
+  document.getElementById('previewContainer').style.display = 'none';
+  document.getElementById('saveScheduleBtn').style.display = 'none';
   const placeholder = document.getElementById('previewPlaceholder');
+  placeholder.style.display = 'block'; 
+  
   placeholder.innerHTML = `<div class="p-4 text-center text-success"><div class="spinner-border spinner-border-sm"></div> 從外部載入 ${year} ${quarter} 框架中...</div>`;
+  
   try {
     const result = await callAPI('getSchedule', { year, quarter });
     if (result.status === 'success' && result.data.length > 0) {
@@ -193,15 +200,24 @@ async function loadScheduleByQuarter() {
     } else {
       placeholder.innerHTML = `<div class="alert alert-warning m-4">查無 ${year} ${quarter} 資料，且外部也無此季度的聚會紀錄。</div>`;
     }
-  } catch (error) { alert("讀取失敗"); }
+  } catch (error) { 
+    placeholder.innerHTML = `<div class="alert alert-danger m-4">❌ 讀取失敗，請確認網路連線。</div>`;
+  }
 }
 
 async function loadScheduleByDateRange() {
   const start = document.getElementById('queryStartDate').value;
   const end = document.getElementById('queryEndDate').value;
   if (!start || !end) return alert("請先設定起訖日期");
+
+  // 🌟 修正：先隱藏舊表格，強制顯示讀取動畫
+  document.getElementById('previewContainer').style.display = 'none';
+  document.getElementById('saveScheduleBtn').style.display = 'none';
   const placeholder = document.getElementById('previewPlaceholder');
+  placeholder.style.display = 'block'; 
+
   placeholder.innerHTML = '<div class="p-4 text-center text-primary"><div class="spinner-border spinner-border-sm"></div> 區間資料讀取中...</div>';
+  
   try {
     const result = await callAPI('getScheduleByDateRange', { startDate: start, endDate: end });
     if (result.status === 'success' && result.data && result.data.length > 0) {
@@ -209,12 +225,11 @@ async function loadScheduleByDateRange() {
       renderPreviewTable(generatedScheduleData);
     } else {
       placeholder.innerHTML = `<div class="alert alert-info m-4">${start} 至 ${end} 無存檔資料。</div>`;
-      document.getElementById('previewContainer').style.display = 'none';
-      document.getElementById('saveScheduleBtn').style.display = 'none';
     }
-  } catch (error) { alert("區間讀取失敗"); }
+  } catch (error) { 
+    placeholder.innerHTML = `<div class="alert alert-danger m-4">❌ 區間讀取失敗。</div>`;
+  }
 }
-
 // 🌟 新增額外聚會 (手動插單)
 function openAddExtraModal() {
   bootstrap.Modal.getOrCreateInstance(document.getElementById('extraMeetingModal')).show();
