@@ -1,13 +1,11 @@
-/* script.js - 敬拜團服事管理系統 (外部講道對接極簡版) */
+/* script.js - 敬拜團服事管理系統 (外部框架驅動 + 列專屬請假版) */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
 
 // --- 全域變數 ---
 let currentPositions = []; 
 let generatedScheduleData = []; 
-let fpInstance = null; 
 let uniquePersonnel = []; 
-let currentLeaveCard = null; 
 let sortablePositions = null; 
 
 // --- 初始化 ---
@@ -167,15 +165,12 @@ async function savePositionsToServer() {
 }
 
 // ==========================================
-// 3. 服事安排 (Modal + 滿版)
+// 3. 服事安排 (外部框架 + 智慧填補)
 // ==========================================
-function openNewScheduleModal() {
-  bootstrap.Modal.getOrCreateInstance(document.getElementById('newScheduleModal')).show();
-  setTimeout(() => { if (fpInstance) fpInstance.redraw(); }, 200);
-}
+
+let currentRowIndexForLeave = -1; // 記錄正在設定哪一列的請假
 
 async function initScheduleTab() {
-  if (!fpInstance) fpInstance = flatpickr("#multiDatePicker", { mode: "multiple", dateFormat: "Y-m-d", locale: "zh" });
   const result = await callAPI('getPositions', {});
   if (result.status === 'success') {
     currentPositions = result.data;
@@ -183,67 +178,20 @@ async function initScheduleTab() {
     currentPositions.forEach(pos => (pos.personnel || '').split(',').forEach(n => n.trim() && nameSet.add(n.trim())));
     uniquePersonnel = Array.from(nameSet).sort();
   }
-  if (!generatedScheduleData.length) {
-    document.getElementById('previewContainer').style.display = 'none';
-    document.getElementById('previewPlaceholder').style.display = 'block';
-  }
-}
-
-function generateSchedule() {
-  const rows = document.querySelectorAll('#dateSettingsContainer .card');
-  let inputConditions = [];
-  rows.forEach(row => {
-    const date = row.querySelector('.s-date').value; 
-    if (date) inputConditions.push({ date, type: row.querySelector('.s-type').value.trim(), leaves: row.querySelector('.s-leave').value.split(',').filter(x => x) });
-  });
-  if (!inputConditions.length) return alert("請先選擇日期");
-  inputConditions.sort((a, b) => a.date.localeCompare(b.date));
-
-  let leaderPool = [], previousLeader = null, consecutive = {};
-  currentPositions.forEach(p => consecutive[p.positionName] = {});
-  generatedScheduleData = [];
-
-  inputConditions.forEach(day => {
-    let daily = { '年度': day.date.substring(0,4), '季度': getQuarter(day.date), '日期': day.date, '聚會名稱': '', '聚會類別': day.type }, assigned = [];
-    currentPositions.forEach(pos => {
-      let name = pos.positionName;
-      let candidates = (pos.personnel || '').split(',').map(s => s.trim()).filter(x => x);
-      let pick = "";
-      if (name === '主領') {
-        if (!leaderPool.length) leaderPool = [...candidates];
-        let valid = leaderPool.filter(p => !day.leaves.includes(p) && p !== previousLeader);
-        if (valid.length) { pick = valid[Math.floor(Math.random()*valid.length)]; leaderPool = leaderPool.filter(p => p !== pick); }
-      } else {
-        let valid = candidates.filter(p => !day.leaves.includes(p) && !assigned.includes(p) && (consecutive[name][p]||0) < 2);
-        if (valid.length) pick = valid[Math.floor(Math.random()*valid.length)];
-      }
-      pick = pick || (pos.isRequired === '是' ? "【待定】" : "");
-      daily[name] = pick;
-      if (pick && pick !== "【待定】") assigned.push(pick);
-      candidates.forEach(c => consecutive[name][c] = (c === pick ? (consecutive[name][c]||0)+1 : 0));
-    });
-    previousLeader = daily['主領'];
-    generatedScheduleData.push(daily);
-  });
-  
-  renderPreviewTable(generatedScheduleData);
-  
-  const modalEl = document.getElementById('newScheduleModal');
-  if (modalEl) bootstrap.Modal.getOrCreateInstance(modalEl).hide();
 }
 
 async function loadScheduleByQuarter() {
   const select = document.getElementById('editQuarterSelect');
   const [year, quarter] = select.value.split('-');
   const placeholder = document.getElementById('previewPlaceholder');
-  placeholder.innerHTML = `<div class="p-4 text-center text-success"><div class="spinner-border spinner-border-sm"></div> 讀取 ${year} ${quarter} 資料中...</div>`;
+  placeholder.innerHTML = `<div class="p-4 text-center text-success"><div class="spinner-border spinner-border-sm"></div> 從外部載入 ${year} ${quarter} 框架中...</div>`;
   try {
     const result = await callAPI('getSchedule', { year, quarter });
     if (result.status === 'success' && result.data.length > 0) {
       generatedScheduleData = result.data;
       renderPreviewTable(generatedScheduleData);
     } else {
-      placeholder.innerHTML = `<div class="alert alert-warning m-4">查無 ${year} ${quarter} 存檔紀錄。</div>`;
+      placeholder.innerHTML = `<div class="alert alert-warning m-4">查無 ${year} ${quarter} 資料，且外部也無此季度的聚會紀錄。</div>`;
     }
   } catch (error) { alert("讀取失敗"); }
 }
@@ -267,12 +215,101 @@ async function loadScheduleByDateRange() {
   } catch (error) { alert("區間讀取失敗"); }
 }
 
+// 🌟 新增額外聚會 (手動插單)
+function openAddExtraModal() {
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('extraMeetingModal')).show();
+}
+
+function confirmAddExtraMeeting() {
+  const date = document.getElementById('extraDate').value;
+  const name = document.getElementById('extraName').value;
+  const type = document.getElementById('extraType').value;
+  if(!date) return alert("請選擇日期！");
+
+  generatedScheduleData.push({
+    '年度': date.substring(0,4),
+    '季度': `Q${Math.floor((parseDateSafe(date).getMonth() + 3) / 3)}`,
+    '日期': date,
+    '聚會名稱': name,
+    '聚會類別': type || '主日',
+    'leaves': [] 
+  });
+  
+  // 重新按日期排序
+  generatedScheduleData.sort((a,b) => parseDateSafe(a['日期']) - parseDateSafe(b['日期']));
+  renderPreviewTable(generatedScheduleData);
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('extraMeetingModal')).hide();
+}
+
+// 🌟 每一列專屬的請假設定
+function openRowLeaveModal(idx) {
+  currentRowIndexForLeave = idx;
+  const currentLeaves = generatedScheduleData[idx].leaves || [];
+  let html = '<div class="row g-2">';
+  uniquePersonnel.forEach(name => {
+    const isChecked = currentLeaves.includes(name) ? 'checked' : '';
+    html += `<div class="col-6 col-sm-4"><div class="form-check"><input class="form-check-input leave-checkbox" type="checkbox" value="${name}" id="chk_${name}" ${isChecked}><label class="form-check-label" for="chk_${name}">${name}</label></div></div>`;
+  });
+  document.getElementById('leaveModalBody').innerHTML = html + '</div>';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('leaveModal')).show();
+}
+
+function confirmLeaveSelection() {
+  const selected = Array.from(document.querySelectorAll('.leave-checkbox:checked')).map(cb => cb.value);
+  generatedScheduleData[currentRowIndexForLeave].leaves = selected;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('leaveModal')).hide();
+  renderPreviewTable(generatedScheduleData); // 重新渲染以顯示休假徽章
+}
+
+// 🌟 智慧填補 (針對畫面中為空的欄位進行排班)
+function smartGenerateSchedule() {
+  if (generatedScheduleData.length === 0) return alert("請先載入季度框架或新增日期！");
+
+  let leaderPool = [], previousLeader = null, consecutive = {};
+  currentPositions.forEach(p => consecutive[p.positionName] = {});
+
+  generatedScheduleData.forEach((row) => {
+    let leaves = row.leaves || [];
+    let assigned = [];
+
+    currentPositions.forEach(pos => {
+      let name = pos.positionName;
+      // 只有當該位置「為空」或「待定」時，才啟動 AI 填空
+      if (!row[name] || row[name] === '【待定】') {
+        let candidates = (pos.personnel || '').split(',').map(s => s.trim()).filter(x => x);
+        let pick = "";
+        
+        if (name === '主領') {
+          if (!leaderPool.length) leaderPool = [...candidates];
+          let valid = leaderPool.filter(p => !leaves.includes(p) && p !== previousLeader);
+          if (valid.length) { pick = valid[Math.floor(Math.random()*valid.length)]; leaderPool = leaderPool.filter(p => p !== pick); }
+        } else {
+          let valid = candidates.filter(p => !leaves.includes(p) && !assigned.includes(p) && (consecutive[name][p]||0) < 2);
+          if (valid.length) pick = valid[Math.floor(Math.random()*valid.length)];
+        }
+        
+        row[name] = pick || (pos.isRequired === '是' ? "【待定】" : "");
+      }
+
+      let finalPick = row[name];
+      if (finalPick && finalPick !== "【待定】") assigned.push(finalPick);
+      if (name === '主領') previousLeader = finalPick;
+      
+      let allCands = (pos.personnel || '').split(',').map(s => s.trim()).filter(x => x);
+      allCands.forEach(c => consecutive[name][c] = (c === finalPick ? (consecutive[name][c]||0)+1 : 0));
+    });
+  });
+  
+  renderPreviewTable(generatedScheduleData);
+}
+
+// 🌟 預覽表格渲染 (加入請假設定按鈕)
 function renderPreviewTable(data) {
   const thead = document.getElementById('previewThead'), tbody = document.getElementById('previewTbody');
   thead.innerHTML = ''; tbody.innerHTML = '';
   if (!data.length) return;
 
-  let headers = ['日期', '聚會名稱', '聚會類別', ...currentPositions.map(p => p.positionName)];
+  let headers = ['請假/狀態', '日期', '聚會名稱', '聚會類別', ...currentPositions.map(p => p.positionName)];
   let trH = document.createElement('tr');
   headers.forEach(h => { let th = document.createElement('th'); th.innerText = h; trH.appendChild(th); });
   thead.appendChild(trH);
@@ -281,7 +318,12 @@ function renderPreviewTable(data) {
     let tr = document.createElement('tr');
     headers.forEach(h => {
       let td = document.createElement('td');
-      if (h === '日期') {
+      
+      if (h === '請假/狀態') {
+        let leaveBadges = (row.leaves || []).map(n => `<span class="badge bg-danger me-1 mt-1">${n}</span>`).join('');
+        td.innerHTML = `<button class="btn btn-sm btn-outline-secondary py-0" style="font-size: 0.75rem;" onclick="openRowLeaveModal(${idx})">設請假</button><br><div style="max-width:80px; white-space:normal;">${leaveBadges}</div>`;
+      }
+      else if (h === '日期') {
         td.innerHTML = `<span class="badge bg-secondary">${row[h]}</span>`;
       } 
       else if (h === '聚會名稱' || h === '聚會類別') {
@@ -307,6 +349,7 @@ function renderPreviewTable(data) {
     });
     tbody.appendChild(tr);
   });
+  
   document.getElementById('previewPlaceholder').style.display = 'none';
   document.getElementById('previewContainer').style.display = 'block';
   document.getElementById('saveScheduleBtn').style.display = 'inline-block';
@@ -318,49 +361,4 @@ async function saveGeneratedSchedule() {
   const result = await callAPI('saveSchedule', { scheduleData: generatedScheduleData });
   if (result.status === 'success') { alert("🎉 排班表已成功存檔！"); loadDashboard(); switchTab('dashboard'); }
   btn.disabled = false; btn.innerText = "儲存並發佈至雲端";
-}
-
-function addSelectedDates() {
-  if (!fpInstance?.selectedDates.length) { alert("請先點選日期"); return; }
-  fpInstance.selectedDates.sort((a, b) => a - b).forEach(dateObj => {
-    const dStr = formatDateSafe(dateObj);
-    const div = document.createElement('div');
-    div.className = 'card mb-2 p-2 border-primary border-opacity-25 shadow-sm';
-    div.innerHTML = `
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <input type="date" class="form-control form-control-sm s-date w-50 me-1" value="${dStr}">
-        <input type="text" class="form-control form-control-sm s-type w-50 text-primary fw-bold text-center" value="主日" onclick="this.select()">
-        <button class="btn btn-sm btn-outline-danger ms-1" onclick="this.closest('.card').remove()">x</button>
-      </div>
-      <button class="btn btn-outline-secondary btn-sm w-100" onclick="openLeaveModal(this)">🔍 設定請假人員</button>
-      <input type="hidden" class="s-leave" value="">
-      <div class="leave-badges mt-2"></div>
-    `;
-    document.getElementById('dateSettingsContainer').appendChild(div);
-  });
-  fpInstance.clear();
-}
-
-function openLeaveModal(btn) {
-  currentLeaveCard = btn.closest('.card');
-  const currentLeaves = currentLeaveCard.querySelector('.s-leave').value.split(',').filter(x => x);
-  let html = '<div class="row g-2">';
-  uniquePersonnel.forEach(name => {
-    const isChecked = currentLeaves.includes(name) ? 'checked' : '';
-    html += `<div class="col-6 col-sm-4"><div class="form-check"><input class="form-check-input leave-checkbox" type="checkbox" value="${name}" id="chk_${name}" ${isChecked}><label class="form-check-label" for="chk_${name}">${name}</label></div></div>`;
-  });
-  document.getElementById('leaveModalBody').innerHTML = html + '</div>';
-  bootstrap.Modal.getOrCreateInstance(document.getElementById('leaveModal')).show();
-}
-
-function confirmLeaveSelection() {
-  const selected = Array.from(document.querySelectorAll('.leave-checkbox:checked')).map(cb => cb.value);
-  currentLeaveCard.querySelector('.s-leave').value = selected.join(',');
-  currentLeaveCard.querySelector('.leave-badges').innerHTML = selected.map(n => `<span class="badge bg-secondary me-1 mb-1" style="font-size:0.7rem;">${n}</span>`).join('');
-  bootstrap.Modal.getOrCreateInstance(document.getElementById('leaveModal')).hide();
-}
-
-function getQuarter(dateString) { 
-  const d = parseDateSafe(dateString);
-  return `Q${Math.floor((d.getMonth() + 3) / 3)}`; 
 }
