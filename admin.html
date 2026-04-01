@@ -59,72 +59,55 @@
   </div>
 
   <div id="schedule" class="tab-content">
-    <div class="row g-4">
-      <div class="col-md-4 col-lg-3">
-        <div class="card p-3 border-0 bg-light mb-3 shadow-sm">
-          <label class="fw-bold text-primary mb-2">Step 1. 準備日期與請假</label>
-          <p class="text-muted" style="font-size: 0.75rem;">先選取日期並「確認新增」</p>
-          <input type="text" id="multiDatePicker" class="form-control mb-2 bg-white" placeholder="點此打開日曆多選...">
-          <button class="btn btn-sm btn-primary w-100 fw-bold mb-3" onclick="addSelectedDates()">確認新增日期</button>
-          <div id="dateSettingsContainer" style="max-height: 200px; overflow-y: auto; border-top: 1px solid #dee2e6; padding-top: 10px;"></div>
+    <div class="card p-3 mb-3 shadow-sm bg-light border-0">
+      <div class="row g-3 align-items-center">
+        <div class="col-12 col-md-auto">
+          <button class="btn btn-danger fw-bold w-100 shadow-sm px-4" onclick="openNewScheduleModal()">🚀 新增排班 (選日期)</button>
         </div>
-
-        <div class="card p-3 border-primary border-opacity-25 shadow-sm">
-          <label class="fw-bold text-dark mb-3">Step 2. 選擇執行功能</label>
-          
-          <div class="mb-3">
-            <button class="btn btn-danger w-100 fw-bold" onclick="generateSchedule()">🚀 1. 自動產生新班表</button>
-            <small class="text-muted d-block mt-1">依上方 Step 1 日期產生</small>
-          </div>
-
-          <hr>
-
-          <div class="mb-3">
-            <label class="fw-bold text-success" style="font-size: 0.75rem;">選擇查詢季度：</label>
-            <select id="editQuarterSelect" class="form-select form-select-sm mb-2">
+        
+        <div class="col-12 col-md-auto">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text fw-bold bg-white text-success">季度讀取</span>
+            <select id="editQuarterSelect" class="form-select text-center" style="min-width: 100px;">
               <option value="2026-Q1">2026-Q1</option>
               <option value="2026-Q2" selected>2026-Q2</option>
               <option value="2026-Q3">2026-Q3</option>
               <option value="2026-Q4">2026-Q4</option>
             </select>
-            <button class="btn btn-outline-success w-100 fw-bold" onclick="loadScheduleByQuarter()">📅 2. 按季度讀取舊表</button>
-          </div>
-
-          <hr>
-
-          <div class="mb-1">
-            <label class="fw-bold text-primary" style="font-size: 0.75rem;">設定查詢區間：</label>
-            <div class="d-flex gap-1 mb-2">
-              <input type="date" id="queryStartDate" class="form-control form-control-sm">
-              <input type="date" id="queryEndDate" class="form-control form-control-sm">
-            </div>
-            <button class="btn btn-outline-primary w-100 fw-bold" onclick="loadScheduleByDateRange()">🔍 3. 按區間日期讀取</button>
+            <button class="btn btn-outline-success fw-bold px-3" onclick="loadScheduleByQuarter()">讀取</button>
           </div>
         </div>
-      </div>
 
-      <div class="col-md-8 col-lg-9">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold text-primary mb-0">排班預覽編輯區</h5>
-          <button class="btn btn-success fw-bold px-4 shadow-sm" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">儲存並發佈至雲端</button>
+        <div class="col-12 col-md-auto">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text fw-bold bg-white text-primary">區間讀取</span>
+            <input type="date" id="queryStartDate" class="form-control">
+            <span class="input-group-text bg-light">至</span>
+            <input type="date" id="queryEndDate" class="form-control">
+            <button class="btn btn-outline-primary fw-bold px-3" onclick="loadScheduleByDateRange()">讀取</button>
+          </div>
         </div>
-        
-        <div class="table-scroll-container" id="previewContainer" style="display: none;">
-          <table class="modern-table">
-            <thead id="previewThead"></thead>
-            <tbody id="previewTbody"></tbody>
-          </table>
-        </div>
-        
-        <div id="previewPlaceholder" class="text-center text-muted mt-4 p-5 bg-light rounded-3 border">
-          <h5 class="text-secondary">請選擇左側功能按鈕以載入或產生資料</h5>
-          <p class="small">您可以選擇「自動產生」或「讀取舊資料」來開始編輯</p>
+
+        <div class="col-12 col-md-auto ms-auto">
+          <button class="btn btn-success fw-bold shadow-sm w-100" id="saveScheduleBtn" onclick="saveGeneratedSchedule()" style="display: none;">💾 儲存並發佈至雲端</button>
         </div>
       </div>
     </div>
+
+    <div class="table-scroll-container bg-white border rounded-3 shadow-sm" id="previewContainer" style="display: none;">
+      <table class="modern-table w-100">
+        <thead id="previewThead"></thead>
+        <tbody id="previewTbody"></tbody>
+      </table>
+    </div>
+    
+    <div id="previewPlaceholder" class="text-center text-muted mt-2 p-5 bg-light rounded-3 border">
+      <h5 class="text-secondary fw-bold mb-3">請由上方工具列選擇操作</h5>
+      <p class="small mb-0">點擊「新增排班」來安排新班表，或使用「季度/區間讀取」修改舊資料。</p>
+    </div>
   </div>
 
-<div id="sermon" class="tab-content">
+  <div id="sermon" class="tab-content">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5 class="fw-bold">📖 牧師、題目與經文快速登錄</h5>
       <div>
@@ -153,10 +136,12 @@
         <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('sermonStartDate').value=''; document.getElementById('sermonEndDate').value=''; loadSermonData();">讀取全部</button>
       </div>
     </div>
+    
     <div class="alert alert-info shadow-sm border-0 small">
       💡 <strong>無痛貼上：</strong>直接把 <strong>Excel 表格</strong> 或 <strong>Line 訊息</strong> 貼進來，點擊「智慧處理」即可！
     </div>
     <textarea id="sermonPasteArea" class="form-control mb-3 border-primary bg-light shadow-sm" rows="6" placeholder="📋 點此貼上文字..."></textarea>
+    
     <div class="table-responsive bg-white rounded-3 shadow-sm border mb-3">
       <table class="table table-hover mb-0 align-middle">
         <thead class="table-dark text-center">
@@ -178,7 +163,7 @@
 
 <div class="modal fade" id="leaveModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
+    <div class="modal-content border-0 shadow-lg">
       <div class="modal-header bg-light">
         <h5 class="modal-title fw-bold">選擇請假人員</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -187,6 +172,38 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
         <button type="button" class="btn btn-primary fw-bold" onclick="confirmLeaveSelection()">確認儲存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="newScheduleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title fw-bold">🚀 安排新班表</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body bg-light">
+        <div class="card p-3 border-0 shadow-sm mb-3">
+          <label class="fw-bold text-primary mb-2">Step 1. 選擇日期並加入清單</label>
+          <div class="d-flex gap-2">
+            <input type="text" id="multiDatePicker" class="form-control bg-white" placeholder="📅 點此打開日曆多選...">
+            <button class="btn btn-primary fw-bold text-nowrap px-4" onclick="addSelectedDates()">新增日期</button>
+          </div>
+        </div>
+        <div class="card p-3 border-0 shadow-sm">
+          <label class="fw-bold text-dark mb-2">Step 2. 確認聚會類別與設定請假人員</label>
+          <div id="dateSettingsContainer" class="pe-2" style="max-height: 40vh; overflow-y: auto;">
+             </div>
+        </div>
+      </div>
+      <div class="modal-footer justify-content-between bg-white">
+        <span class="text-muted small">💡 設定完成後，點擊右方按鈕讓系統自動排班</span>
+        <div>
+          <button type="button" class="btn btn-light border fw-bold" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-danger fw-bold px-4 shadow-sm" onclick="generateSchedule()">✨ 產生排班表</button>
+        </div>
       </div>
     </div>
   </div>
