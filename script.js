@@ -1,7 +1,5 @@
 /* script.js - 敬拜團服事管理系統 (外部框架驅動 + 列專屬請假版) */
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbyk_6tUucVg-U4rRQjYHvk632teZyxufDkNX_X1WRUXPMGgsTaemVXD_mv9kBDjuSwOnA/exec';
-
 // --- 全域變數 ---
 let currentPositions = []; 
 let generatedScheduleData = []; 
@@ -30,20 +28,21 @@ function parseDateSafe(dateStr) {
   return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
 }
 
+// --- 🌟 安全網橋接設定 ---
+// 不再硬寫 API_URL，改為直接呼叫 config.js 提供的 churchAPI
 async function callAPI(action, payload) {
   try {
-    const response = await fetch(API_URL, { 
-      method: 'POST', 
-      body: JSON.stringify({ action: action, ...payload }) 
-    });
-    const rawText = await response.text();
-    try {
-      return JSON.parse(rawText);
-    } catch (parseError) {
-      throw new Error("伺服器回傳格式錯誤");
+    // 確保中央設定檔已載入
+    if (typeof window.churchAPI !== 'function') {
+      throw new Error("中央安全設定檔 (config.js) 尚未載入，請檢查 HTML 引用路徑。");
     }
-  } catch (networkError) {
-    throw networkError;
+    
+    // 直接轉發請求給中央工具，它會自動處理 Token、Base64 解碼與 POST/GET 判斷
+    return await window.churchAPI(action, payload);
+    
+  } catch (error) {
+    console.error("🚫 API 通訊失敗:", error);
+    throw error;
   }
 }
 
