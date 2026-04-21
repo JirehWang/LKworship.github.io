@@ -86,7 +86,9 @@ function renderDashboardTable(data) {
     container.innerHTML = '<div class="alert alert-light text-center m-4">📋 本季度暫無排班資料。</div>';
     return;
   }
-  const fixedHeaders = ['日期', '聚會名稱', '聚會類別', '牧師', '題目', '經文'];
+  // 固定欄位：日期、聚會名稱、聚會類別、牧師、題目、經文、敬拜曲目
+  // 然後才是服事同工（主領、配唱...等動態欄位）
+  const fixedHeaders = ['日期', '聚會名稱', '聚會類別', '牧師', '題目', '經文', '敬拜曲目'];
   const allKeys = Object.keys(data[0]);
   const dynamicHeaders = allKeys.filter(k => !fixedHeaders.includes(k) && !['hasWarning', 'warningMessage', '年度', '季度'].includes(k));
   const finalHeaders = [...fixedHeaders, ...dynamicHeaders];
